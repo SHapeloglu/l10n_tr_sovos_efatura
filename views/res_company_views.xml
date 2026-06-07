@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_company_form_sovos" model="ir.ui.view">
+        <field name="name">res.company.form.sovos</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[last()]" position="after">
+                <page string="Sovos e-Fatura" name="sovos_efatura">
+                    <group string="e-Fatura (InvoiceService)">
+                        <field name="x_sovos_invoice_user" password="False"/>
+                        <field name="x_sovos_invoice_pass" password="True"/>
+                        <field name="x_sovos_sender_vkn"/>
+                        <field name="x_sovos_identifier"/>
+                        <field name="x_invoice_sequence_id"/>
+                    </group>
+                    <group string="e-Arşiv (ArchiveService)">
+                        <field name="x_sovos_archive_user" password="False"/>
+                        <field name="x_sovos_archive_pass" password="True"/>
+                        <field name="x_sovos_template_id"/>
+                    </group>
+                    <group string="Genel Ayarlar">
+                        <field name="x_sovos_test_mode"/>
+                        <field name="x_sovos_admin_email"/>
+                    </group>
+                    <div class="o_row">
+                        <button name="action_test_invoice_connection"
+                                string="e-Fatura Bağlantısını Test Et"
+                                type="object"
+                                class="btn btn-secondary me-2"/>
+                        <button name="action_test_archive_connection"
+                                string="e-Arşiv Bağlantısını Test Et"
+                                type="object"
+                                class="btn btn-secondary"/>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

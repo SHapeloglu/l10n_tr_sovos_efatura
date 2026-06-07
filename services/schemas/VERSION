@@ -1,0 +1,23 @@
+UBL-TR Şema Versiyonu
+=====================
+XSD: UBL-Invoice-2.1.xsd
+Schematron: UBL-TR_Main_Schematron.sch (XSLT pre-compiled: UBL-TR_Main_Schematron.sch.xsl)
+
+Kaynak: https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaket.zip
+Son Güncelleme: Haziran 2026
+
+GİB şema güncellemelerinde (yılda 1-2 kez) modül versiyonu yükseltilir.
+Şema dosyaları bu dizine kopyalanır ve modül güncelleme süreciyle dağıtılır.
+
+KURULUM:
+1. https://ebelge.gib.gov.tr adresinden e-FaturaPaket.zip indirin.
+2. UBL-Invoice-2.1.xsd → bu dizine kopyalayın.
+3. UBL-TR_Main_Schematron.xml dosyasını XSLT'ye derleyin:
+   python3 -c "
+   from lxml import etree
+   sch = etree.parse('UBL-TR_Main_Schematron.xml')
+   xslt = etree.XSLT(sch)
+   # compiled — lxml içinde kullanılır
+   "
+   veya schematron derleyici ile compile edin.
+4. Derlenmiş XSLT'yi UBL-TR_Main_Schematron.sch.xsl olarak kaydedin.

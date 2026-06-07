@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_cancel_invoice_wizard_form" model="ir.ui.view">
+        <field name="name">sovos.cancel.invoice.wizard.form</field>
+        <field name="model">sovos.cancel.invoice.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Fatura İptal">
+                <group>
+                    <field name="invoice_id" readonly="1"/>
+                    <field name="efatura_type" readonly="1"/>
+                    <field name="efatura_scenario" readonly="1"/>
+                    <field name="cancel_reason" required="1"/>
+                </group>
+                <!-- TEMELFATURA için GİB portal linki + onay -->
+                <div invisible="efatura_scenario != 'TEMELFATURA'"
+                     class="alert alert-warning" role="alert">
+                    <p><strong>⚠ TEMELFATURA İptal Prosedürü</strong></p>
+                    <p>TEMELFATURA iptali GİB portalından yapılmalıdır:</p>
+                    <p><a href="https://ebelge.gib.gov.tr" target="_blank">GİB e-Belge Portali</a></p>
+                    <field name="gib_portal_confirmed"/>
+                    <label for="gib_portal_confirmed" string="GİB Portalında iptali tamamladım ✓"/>
+                </div>
+                <!-- e-Arşiv için bilgi -->
+                <div invisible="efatura_type != 'earsiv'"
+                     class="alert alert-info" role="alert">
+                    e-Arşiv iptali Sovos API üzerinden otomatik yapılır. GİB portala gitmenize gerek yok.
+                </div>
+                <footer>
+                    <button name="action_cancel" string="Faturayı İptal Et"
+                            type="object" class="btn btn-danger"/>
+                    <button string="Vazgeç" class="btn btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

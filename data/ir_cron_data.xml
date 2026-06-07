@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ── Gelen Fatura Senkronizasyonu: 15 dk ── -->
+    <record id="cron_sync_incoming_invoices" model="ir.cron">
+        <field name="name">e-Fatura: Gelen Fatura Senkronizasyonu</field>
+        <field name="model_id" ref="model_sovos_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_sync_incoming_invoices()</field>
+        <field name="interval_number">15</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+        <field name="priority">5</field>
+    </record>
+
+    <!-- ── e-Fatura Durum Takibi: 30 dk ── -->
+    <record id="cron_sync_efatura_status" model="ir.cron">
+        <field name="name">e-Fatura: Giden Durum Takibi (InvoiceService)</field>
+        <field name="model_id" ref="model_sovos_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_sync_efatura_status()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+        <field name="priority">5</field>
+    </record>
+
+    <!-- ── e-Arşiv Durum Takibi: 30 dk (AYRI cron) ── -->
+    <record id="cron_sync_earsiv_status" model="ir.cron">
+        <field name="name">e-Arşiv: Giden Durum Takibi (ArchiveService)</field>
+        <field name="model_id" ref="model_sovos_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_sync_earsiv_status()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+        <field name="priority">5</field>
+    </record>
+
+    <!-- ── TICARIFATURA KABUL/RED: 1 saat ── -->
+    <record id="cron_sync_inv_responses" model="ir.cron">
+        <field name="name">e-Fatura: TICARIFATURA KABUL/RED Takibi</field>
+        <field name="model_id" ref="model_sovos_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_sync_inv_responses()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+        <field name="priority">5</field>
+    </record>
+
+    <!-- ── 8 Gün Uyarısı: Günlük ── -->
+    <record id="cron_check_8day_warnings" model="ir.cron">
+        <field name="name">e-Fatura: 8 Gün Yanıt Süresi Uyarısı</field>
+        <field name="model_id" ref="model_sovos_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_check_8day_warnings()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+        <field name="priority">10</field>
+    </record>
+
+    <!-- ── VKN Cache Güncelleme: Günlük ── -->
+    <record id="cron_refresh_vkn_cache" model="ir.cron">
+        <field name="name">e-Fatura: VKN Cache Güncelleme (30 gün)</field>
+        <field name="model_id" ref="model_sovos_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_refresh_vkn_cache()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">days</field>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+        <field name="priority">10</field>
+    </record>
+
+</odoo>

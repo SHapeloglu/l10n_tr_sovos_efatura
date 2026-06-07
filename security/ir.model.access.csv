@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sovos_sync_user,sovos.sync user,model_sovos_sync,account.group_account_user,1,0,0,0
+access_sovos_sync_manager,sovos.sync manager,model_sovos_sync,account.group_account_manager,1,1,1,1
+access_resend_wizard_user,resend wizard user,model_sovos_resend_invoice_wizard,account.group_account_user,1,1,1,1
+access_cancel_wizard_user,cancel wizard user,model_sovos_cancel_invoice_wizard,account.group_account_user,1,1,1,1
+access_kurfarki_wizard_user,kurfarki wizard user,model_sovos_kur_farki_wizard,account.group_account_user,1,1,1,1

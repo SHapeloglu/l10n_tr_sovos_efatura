@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_sovos" model="ir.ui.view">
+        <field name="name">res.partner.form.sovos</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='sales_purchases']" position="after">
+                <page string="e-Fatura" name="efatura_tab">
+                    <group>
+                        <field name="x_efatura_type"/>
+                        <field name="x_default_scenario"/>
+                        <field name="x_vergi_dairesi"/>
+                        <field name="x_efatura_alias"/>
+                        <field name="x_efatura_type_updated" readonly="1"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

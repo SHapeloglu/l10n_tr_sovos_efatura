@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- Fatura Form View — e-Fatura alanları + inline uyarı bandı      -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <record id="view_move_form_sovos" model="ir.ui.view">
+        <field name="name">account.move.form.sovos</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <!-- ── Inline Uyarı Bandı ──────────────────────────────── -->
+            <xpath expr="//sheet" position="before">
+
+                <!-- Kırmızı: Hata -->
+                <div class="alert alert-danger" role="alert"
+                     invisible="x_efatura_status not in ('error',)">
+                    <strong>❌ e-Fatura Hatası:</strong>
+                    <span><field name="x_efatura_error_msg" readonly="1" nolabel="1"/></span>
+                    <button name="%(action_resend_invoice_wizard)d"
+                            string="Tekrar Gönder"
+                            type="action"
+                            class="btn btn-sm btn-danger ms-2"
+                            invisible="x_efatura_status != 'error'"/>
+                </div>
+
+                <!-- Turuncu: Reddedildi -->
+                <div class="alert alert-warning" role="alert"
+                     invisible="x_efatura_status not in ('rejected',)">
+                    <strong>⚠ Fatura Reddedildi:</strong>
+                    <span><field name="x_efatura_error_msg" readonly="1" nolabel="1"/></span>
+                </div>
+
+                <!-- Sarı: 8 Gün Uyarısı -->
+                <div class="alert alert-warning" role="alert"
+                     invisible="not x_show_8day_warning">
+                    <strong>⏰ TICARIFATURA Yanıt Süresi Dolmak Üzere!</strong>
+                    Son Gün: <field name="x_inv_response_deadline" readonly="1" nolabel="1"/>
+                </div>
+
+                <!-- Yeşil: Kabul -->
+                <div class="alert alert-success" role="alert"
+                     invisible="x_efatura_status not in ('accepted',)">
+                    <strong>✅ e-Fatura Kabul Edildi</strong>
+                    <span invisible="x_efatura_send_date == False">
+                        — Gönderim: <field name="x_efatura_send_date" readonly="1" nolabel="1"/>
+                    </span>
+                </div>
+
+                <!-- Mavi: Gönderildi, yanıt bekliyor -->
+                <div class="alert alert-info" role="alert"
+                     invisible="x_efatura_status not in ('sent', 'sending')">
+                    <strong>📤 e-Fatura Gönderildi — Yanıt Bekleniyor</strong>
+                    UUID: <field name="x_sovos_uuid" readonly="1" nolabel="1"/>
+                </div>
+
+            </xpath>
+
+            <!-- ── e-Fatura Notebook Sekmesi ───────────────────────── -->
+            <xpath expr="//notebook" position="inside">
+                <page string="e-Fatura" name="efatura_tab"
+                      invisible="move_type not in ('out_invoice', 'in_invoice')">
+                    <group>
+                        <group string="Durum">
+                            <field name="x_efatura_status" readonly="1"/>
+                            <field name="x_efatura_type" readonly="1"/>
+                            <field name="x_efatura_scenario"/>
+                            <field name="x_efatura_send_date" readonly="1"/>
+                            <field name="x_number_status" readonly="1"/>
+                        </group>
+                        <group string="TICARIFATURA Yanıt">
+                            <field name="x_inv_response_status" readonly="1"/>
+                            <field name="x_inv_response_deadline" readonly="1"/>
+                            <field name="x_show_8day_warning" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Teknik Bilgiler" groups="base.group_system">
+                        <field name="x_sovos_uuid" readonly="1"/>
+                        <field name="x_sovos_envelope_uuid" readonly="1"/>
+                        <field name="x_cust_inv_id" readonly="1"/>
+                        <field name="x_gib_status_code" readonly="1"/>
+                        <field name="x_reserved_number" readonly="1"/>
+                    </group>
+                    <group string="Validasyon Hataları" groups="base.group_system"
+                           invisible="not x_validation_errors">
+                        <field name="x_validation_errors" readonly="1" nolabel="1"
+                               widget="text"/>
+                    </group>
+
+                    <!-- Butonlar -->
+                    <div class="o_row mt-3"
+                         invisible="move_type != 'out_invoice'">
+                        <button name="action_preview_efatura"
+                                string="📋 Faturayı Önizle"
+                                type="object"
+                                class="btn btn-secondary me-2"
+                                invisible="x_efatura_status not in ('draft',)"/>
+                        <button name="action_download_efatura_pdf"
+                                string="📥 PDF İndir"
+                                type="object"
+                                class="btn btn-secondary me-2"
+                                invisible="not x_sovos_uuid"/>
+                        <button name="%(action_cancel_invoice_wizard)d"
+                                string="🚫 İptal Et"
+                                type="action"
+                                class="btn btn-danger me-2"
+                                invisible="x_efatura_status not in ('sent','accepted','error')"/>
+                        <button name="%(action_kur_farki_wizard)d"
+                                string="💱 Kur Farkı Faturası"
+                                type="action"
+                                class="btn btn-secondary"
+                                invisible="x_efatura_status not in ('accepted', 'sent')"/>
+                    </div>
+                </page>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- Wizard Action Referansları                                      -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <record id="action_resend_invoice_wizard" model="ir.actions.act_window">
+        <field name="name">Tekrar Gönder</field>
+        <field name="res_model">sovos.resend.invoice.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_invoice_id': active_id}</field>
+    </record>
+
+    <record id="action_cancel_invoice_wizard" model="ir.actions.act_window">
+        <field name="name">Fatura İptal</field>
+        <field name="res_model">sovos.cancel.invoice.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_invoice_id': active_id}</field>
+    </record>
+
+    <record id="action_kur_farki_wizard" model="ir.actions.act_window">
+        <field name="name">Kur Farkı Faturası</field>
+        <field name="res_model">sovos.kur.farki.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_original_invoice_id': active_id}</field>
+    </record>
+
+</odoo>

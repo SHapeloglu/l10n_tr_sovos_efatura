@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- Fatura Listesi — e-Fatura sütunları + Toplu Gönderim butonu    -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <record id="view_move_list_sovos" model="ir.ui.view">
+        <field name="name">account.move.list.sovos</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//list" position="attributes">
+                <attribute name="multi_edit">1</attribute>
+            </xpath>
+            <xpath expr="//field[@name='amount_total']" position="after">
+                <field name="x_efatura_status" optional="show"
+                       decoration-success="x_efatura_status == 'accepted'"
+                       decoration-danger="x_efatura_status == 'error'"
+                       decoration-warning="x_efatura_status in ('rejected',)"
+                       decoration-info="x_efatura_status in ('sent', 'sending')"/>
+                <field name="x_efatura_type" optional="hide"/>
+                <field name="x_efatura_scenario" optional="hide"/>
+                <field name="x_sovos_uuid" optional="hide"/>
+                <field name="x_gib_status_code" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- Action: Toplu e-Fatura Gönder (sunucu aksiyonu)                -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <record id="action_send_efatura_bulk" model="ir.actions.server">
+        <field name="name">e-Fatura Olarak Gönder</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_send_efatura_bulk()</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- e-Fatura Dashboard — Filtreli Görünümler                       -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+
+    <!-- Gönderildi — Yanıt Bekliyor -->
+    <record id="action_efatura_sent_waiting" model="ir.actions.act_window">
+        <field name="name">Gönderildi — Yanıt Bekliyor</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('x_efatura_status', '=', 'sent'), ('move_type', '=', 'out_invoice')]</field>
+        <field name="context">{'default_move_type': 'out_invoice'}</field>
+    </record>
+
+    <!-- Hata Var — Aksiyon Gerekli -->
+    <record id="action_efatura_errors" model="ir.actions.act_window">
+        <field name="name">Hata Var — Aksiyon Gerekli</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('x_efatura_status', '=', 'error'), ('move_type', '=', 'out_invoice')]</field>
+    </record>
+
+    <!-- Validasyon Hatası -->
+    <record id="action_efatura_validation_errors" model="ir.actions.act_window">
+        <field name="name">Validasyon Hatası</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('x_number_status', '=', 'released'), ('x_validation_errors', '!=', False)]</field>
+    </record>
+
+    <!-- 8 Gün Uyarısı -->
+    <record id="action_efatura_8day_warning" model="ir.actions.act_window">
+        <field name="name">⏰ 8 Gün Uyarısı</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('x_inv_response_status', '=', 'beklemede'),
+            ('x_show_8day_warning', '=', True),
+        ]</field>
+    </record>
+
+    <!-- Red Edildi -->
+    <record id="action_efatura_rejected" model="ir.actions.act_window">
+        <field name="name">Reddedildi</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('x_efatura_status', '=', 'rejected')]</field>
+    </record>
+
+    <!-- Gelen — Partner Eşlenecek -->
+    <record id="action_efatura_incoming_unmatched" model="ir.actions.act_window">
+        <field name="name">Gelen — Partner Eşlenecek</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('move_type', '=', 'in_invoice'), ('partner_id', '=', False)]</field>
+    </record>
+
+    <!-- Bu Ay Gönderildi -->
+    <record id="action_efatura_accepted_this_month" model="ir.actions.act_window">
+        <field name="name">Bu Ay Kabul Edildi</field>
+        <field name="res_model">account.move</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[
+            ('x_efatura_status', '=', 'accepted'),
+            ('x_efatura_send_date', '&gt;=', (context_today() + relativedelta(day=1)).strftime('%Y-%m-%d')),
+        ]</field>
+    </record>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- Dashboard Menüsü                                               -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <menuitem id="menu_efatura_root"
+              name="e-Fatura"
+              parent="account.menu_finance"
+              sequence="99"/>
+
+    <menuitem id="menu_efatura_sent_waiting"
+              name="Yanıt Bekliyor"
+              parent="menu_efatura_root"
+              action="action_efatura_sent_waiting"
+              sequence="10"/>
+
+    <menuitem id="menu_efatura_errors"
+              name="Hata — Aksiyon Gerekli"
+              parent="menu_efatura_root"
+              action="action_efatura_errors"
+              sequence="20"/>
+
+    <menuitem id="menu_efatura_validation_errors"
+              name="Validasyon Hatası"
+              parent="menu_efatura_root"
+              action="action_efatura_validation_errors"
+              sequence="25"/>
+
+    <menuitem id="menu_efatura_8day"
+              name="8 Gün Uyarısı"
+              parent="menu_efatura_root"
+              action="action_efatura_8day_warning"
+              sequence="30"/>
+
+    <menuitem id="menu_efatura_rejected"
+              name="Reddedildi"
+              parent="menu_efatura_root"
+              action="action_efatura_rejected"
+              sequence="40"/>
+
+    <menuitem id="menu_efatura_incoming"
+              name="Gelen — Partner Eşle"
+              parent="menu_efatura_root"
+              action="action_efatura_incoming_unmatched"
+              sequence="50"/>
+
+    <menuitem id="menu_efatura_accepted"
+              name="Bu Ay Kabul Edildi"
+              parent="menu_efatura_root"
+              action="action_efatura_accepted_this_month"
+              sequence="60"/>
+
+</odoo>
