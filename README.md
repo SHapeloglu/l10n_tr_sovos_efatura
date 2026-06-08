@@ -147,7 +147,7 @@ action_post() (tekil) VEYA 'Toplu Gönder' (çoklu)
 
 2. GİB şema dosyalarını yerleştirin (`services/schemas/` dizinine):
    - `UBL-Invoice-2.1.xsd`
-   - `UBL-TR_Main_Schematron.xml`
+   - `UBL-TR_Main_Schematron.sch.xsl` (pre-compiled XSLT)
    - `VERSION` (şema versiyon takibi)
 
    > Şema dosyaları: https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaket.zip
@@ -195,7 +195,7 @@ l10n_tr_sovos_efatura/
 │   ├── ubl_validator.py        # XSD + Schematron validasyon
 │   └── schemas/                # GİB şema dosyaları
 │       ├── UBL-Invoice-2.1.xsd
-│       ├── UBL-TR_Main_Schematron.xml
+│       ├── UBL-TR_Main_Schematron.sch.xsl  # Pre-compiled XSLT
 │       └── VERSION             # Şema versiyon takibi
 ├── wizards/
 │   ├── resend_invoice_wizard.py
@@ -230,6 +230,7 @@ l10n_tr_sovos_efatura/
 | `x_reserved_number` | Char(50) | Rezerve edilen fatura numarası |
 | `x_number_status` | Selection | `reserved/confirmed/released` |
 | `x_validation_errors` | Text | Son XSD/Schematron hata detayları |
+| `x_gib_status_code` | Integer | Son GİB durum kodu — durum geçişi takibi |
 
 ---
 
@@ -250,7 +251,7 @@ from lxml import etree
 import os
 
 XSD_PATH = os.path.join(os.path.dirname(__file__), 'schemas/UBL-Invoice-2.1.xsd')
-SCH_PATH = os.path.join(os.path.dirname(__file__), 'schemas/UBL-TR_Main_Schematron.xml')
+SCH_PATH = os.path.join(os.path.dirname(__file__), 'schemas/UBL-TR_Main_Schematron.sch.xsl')  # Pre-compiled XSLT
 
 def validate(xml_bytes):
     # Katman 1: XSD

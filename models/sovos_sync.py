@@ -11,9 +11,6 @@ class SovosSync(models.Model):
     _name = 'sovos.sync'
     _description = 'Sovos Senkronizasyon Görevleri'
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Çok Şirket Döngüsü
-    # ═════════════════════════════════════════════════════════════════════
     @api.model
     def _cron_run_for_all_companies(self, task_fn_name):
         companies = self.env['res.company'].search([
@@ -29,7 +26,6 @@ class SovosSync(models.Model):
                 continue
 
     def _notify_admin(self, company, task_name, error_msg):
-        """Cron hatasında admin kullanıcıya Odoo bildirimi."""
         try:
             admin = self.env.ref('base.user_admin')
             self.env['mail.message'].create({
@@ -43,7 +39,6 @@ class SovosSync(models.Model):
                 'partner_ids': [(4, admin.partner_id.id)],
                 'author_id': self.env.ref('base.user_root').partner_id.id,
             })
-            # E-posta bildirimi
             if company.x_sovos_admin_email:
                 self.env['mail.mail'].create({
                     'subject': '[Odoo e-Fatura] Cron Hatası — %s' % company.name,
@@ -53,9 +48,7 @@ class SovosSync(models.Model):
         except Exception as e:
             _logger.error('Admin bildirimi gönderilemedi: %s', e)
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Cron: Gelen Fatura Senkronizasyonu (15 dk)
-    # ═════════════════════════════════════════════════════════════════════
+    # ── Gelen Fatura Senkronizasyonu (15 dk) ──────────────────────────
     @api.model
     def cron_sync_incoming_invoices(self):
         self._cron_run_for_all_companies('_sync_incoming_for_company')
@@ -65,7 +58,6 @@ class SovosSync(models.Model):
         svc = SovosInvoiceService(company)
         invoices = svc.get_inbound_list()
         AccountMove = self.env['account.move'].with_company(company)
-
         for inv_data in invoices:
             uuid = inv_data.get('uuid')
             if not uuid:
@@ -76,29 +68,22 @@ class SovosSync(models.Model):
             ], limit=1)
             if existing:
                 continue
-
-            # Partner eşleştir
             partner = self._find_partner_by_vkn(inv_data.get('sender_vkn'))
-
-            move_vals = {
+            AccountMove.create({
                 'move_type': 'in_invoice',
                 'partner_id': partner.id if partner else False,
                 'invoice_date': inv_data.get('invoice_date'),
                 'x_sovos_uuid': uuid,
                 'x_efatura_status': 'accepted',
                 'x_efatura_type': 'efatura',
-            }
-            move = AccountMove.create(move_vals)
-            _logger.info('Gelen fatura oluşturuldu: %s (UUID: %s)', move.id, uuid)
+            })
 
     def _find_partner_by_vkn(self, vkn):
         if not vkn:
             return False
         return self.env['res.partner'].search([('vat', '=', vkn)], limit=1)
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Cron: e-Fatura Durum Takibi (30 dk)
-    # ═════════════════════════════════════════════════════════════════════
+    # ── e-Fatura Durum Takibi (30 dk) ─────────────────────────────────
     @api.model
     def cron_sync_efatura_status(self):
         self._cron_run_for_all_companies('_sync_efatura_status_for_company')
@@ -118,9 +103,7 @@ class SovosSync(models.Model):
             except Exception as e:
                 _logger.warning('Durum sorgusu başarısız (%s): %s', move.x_sovos_uuid, e)
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Cron: e-Arşiv Durum Takibi (30 dk) — AYRI
-    # ═════════════════════════════════════════════════════════════════════
+    # ── e-Arşiv Durum Takibi (30 dk — AYRI) ───────────────────────────
     @api.model
     def cron_sync_earsiv_status(self):
         self._cron_run_for_all_companies('_sync_earsiv_status_for_company')
@@ -140,9 +123,7 @@ class SovosSync(models.Model):
             except Exception as e:
                 _logger.warning('e-Arşiv durum sorgusu başarısız (%s): %s', move.x_sovos_uuid, e)
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Cron: TICARIFATURA KABUL/RED Takibi (1 saat)
-    # ═════════════════════════════════════════════════════════════════════
+    # ── TICARIFATURA KABUL/RED Takibi (1 saat) ────────────────────────
     @api.model
     def cron_sync_inv_responses(self):
         self._cron_run_for_all_companies('_sync_inv_responses_for_company')
@@ -159,17 +140,15 @@ class SovosSync(models.Model):
                 ('x_sovos_uuid', '=', uuid)
             ], limit=1)
             if move:
-                status_code = resp.get('status_code')
-                move._process_gib_status(status_code)
+                move._process_gib_status(resp.get('status_code'))
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Cron: 8 Gün Uyarısı (Günlük)
-    # ═════════════════════════════════════════════════════════════════════
+    # ── 8 Gün Uyarısı (Günlük) ────────────────────────────────────────
     @api.model
     def cron_check_8day_warnings(self):
         self._cron_run_for_all_companies('_check_8day_for_company')
 
     def _check_8day_for_company(self, company):
+        # DÜZELTME #10: x_show_8day_warning store=False → tarih hesaplaması burada yapılır
         tomorrow = date.today() + timedelta(days=1)
         expiring = self.env['account.move'].with_company(company).search([
             ('x_inv_response_status', '=', 'beklemede'),
@@ -178,15 +157,12 @@ class SovosSync(models.Model):
         ])
         for move in expiring:
             _logger.warning('8 gün uyarısı: %s (son gün: %s)', move.name, move.x_inv_response_deadline)
-            # Chatter mesajı
             move.message_post(
                 body=_('⚠ TICARIFATURA yanıt süresi dolmak üzere! Son gün: %s') % move.x_inv_response_deadline,
                 subtype_id=self.env.ref('mail.mt_note').id,
             )
 
-    # ═════════════════════════════════════════════════════════════════════
-    # Cron: VKN Cache Güncelleme (Günlük)
-    # ═════════════════════════════════════════════════════════════════════
+    # ── VKN Cache Güncelleme (Günlük) ─────────────────────────────────
     @api.model
     def cron_refresh_vkn_cache(self):
         self._cron_run_for_all_companies('_refresh_vkn_for_company')

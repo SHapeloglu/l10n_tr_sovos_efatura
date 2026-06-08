@@ -1,5 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- Wizard Actions                                                  -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <record id="action_resend_invoice_wizard" model="ir.actions.act_window">
+        <field name="name">Tekrar Gönder</field>
+        <field name="res_model">sovos.resend.invoice.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_invoice_id': active_id}</field>
+    </record>
+
+    <record id="action_cancel_invoice_wizard" model="ir.actions.act_window">
+        <field name="name">Fatura İptal</field>
+        <field name="res_model">sovos.cancel.invoice.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_invoice_id': active_id}</field>
+    </record>
+
+    <record id="action_kur_farki_wizard" model="ir.actions.act_window">
+        <field name="name">Kur Farkı Faturası</field>
+        <field name="res_model">sovos.kur.farki.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_original_invoice_id': active_id}</field>
+    </record>
+
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- Fatura Form View — e-Fatura alanları + inline uyarı bandı      -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -17,11 +45,10 @@
                      invisible="x_efatura_status not in ('error',)">
                     <strong>❌ e-Fatura Hatası:</strong>
                     <span><field name="x_efatura_error_msg" readonly="1" nolabel="1"/></span>
-                    <button name="%(action_resend_invoice_wizard)d"
+                    <button name="action_open_resend_wizard"
                             string="Tekrar Gönder"
-                            type="action"
-                            class="btn btn-sm btn-danger ms-2"
-                            invisible="x_efatura_status != 'error'"/>
+                            type="object"
+                            class="btn btn-sm btn-danger ms-2"/>
                 </div>
 
                 <!-- Turuncu: Reddedildi -->
@@ -100,14 +127,14 @@
                                 type="object"
                                 class="btn btn-secondary me-2"
                                 invisible="not x_sovos_uuid"/>
-                        <button name="%(action_cancel_invoice_wizard)d"
+                        <button name="action_open_cancel_wizard"
                                 string="🚫 İptal Et"
-                                type="action"
+                                type="object"
                                 class="btn btn-danger me-2"
                                 invisible="x_efatura_status not in ('sent','accepted','error')"/>
-                        <button name="%(action_kur_farki_wizard)d"
+                        <button name="action_open_kur_farki_wizard"
                                 string="💱 Kur Farkı Faturası"
-                                type="action"
+                                type="object"
                                 class="btn btn-secondary"
                                 invisible="x_efatura_status not in ('accepted', 'sent')"/>
                     </div>
@@ -115,33 +142,6 @@
             </xpath>
 
         </field>
-    </record>
-
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- Wizard Action Referansları                                      -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
-    <record id="action_resend_invoice_wizard" model="ir.actions.act_window">
-        <field name="name">Tekrar Gönder</field>
-        <field name="res_model">sovos.resend.invoice.wizard</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-        <field name="context">{'default_invoice_id': active_id}</field>
-    </record>
-
-    <record id="action_cancel_invoice_wizard" model="ir.actions.act_window">
-        <field name="name">Fatura İptal</field>
-        <field name="res_model">sovos.cancel.invoice.wizard</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-        <field name="context">{'default_invoice_id': active_id}</field>
-    </record>
-
-    <record id="action_kur_farki_wizard" model="ir.actions.act_window">
-        <field name="name">Kur Farkı Faturası</field>
-        <field name="res_model">sovos.kur.farki.wizard</field>
-        <field name="view_mode">form</field>
-        <field name="target">new</field>
-        <field name="context">{'default_original_invoice_id': active_id}</field>
     </record>
 
 </odoo>

@@ -9,7 +9,6 @@
         <field name="code">model.cron_sync_incoming_invoices()</field>
         <field name="interval_number">15</field>
         <field name="interval_type">minutes</field>
-        <field name="numbercall">-1</field>
         <field name="active">True</field>
         <field name="priority">5</field>
     </record>
@@ -22,7 +21,6 @@
         <field name="code">model.cron_sync_efatura_status()</field>
         <field name="interval_number">30</field>
         <field name="interval_type">minutes</field>
-        <field name="numbercall">-1</field>
         <field name="active">True</field>
         <field name="priority">5</field>
     </record>
@@ -35,7 +33,6 @@
         <field name="code">model.cron_sync_earsiv_status()</field>
         <field name="interval_number">30</field>
         <field name="interval_type">minutes</field>
-        <field name="numbercall">-1</field>
         <field name="active">True</field>
         <field name="priority">5</field>
     </record>
@@ -48,7 +45,6 @@
         <field name="code">model.cron_sync_inv_responses()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">hours</field>
-        <field name="numbercall">-1</field>
         <field name="active">True</field>
         <field name="priority">5</field>
     </record>
@@ -61,7 +57,6 @@
         <field name="code">model.cron_check_8day_warnings()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
         <field name="active">True</field>
         <field name="priority">10</field>
     </record>
@@ -74,7 +69,6 @@
         <field name="code">model.cron_refresh_vkn_cache()</field>
         <field name="interval_number">1</field>
         <field name="interval_type">days</field>
-        <field name="numbercall">-1</field>
         <field name="active">True</field>
         <field name="priority">10</field>
     </record>
