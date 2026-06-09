@@ -12,12 +12,28 @@ GİB şema güncellemelerinde (yılda 1-2 kez) modül versiyonu yükseltilir.
 KURULUM:
 1. https://ebelge.gib.gov.tr adresinden e-FaturaPaket.zip indirin.
 2. UBL-Invoice-2.1.xsd → bu dizine kopyalayın.
-3. UBL-TR_Main_Schematron.xml dosyasını XSLT'ye derleyin:
+3. GİB Schematron, queryBinding="xslt2" ile üretilmiştir; lxml (XSLT 1.0)
+   kullanılamaz. Saxon HE ile derleyin:
+
+   # Gereksinim: pip install saxonche
    python3 -c "
-   from lxml import etree
-   sch = etree.parse('UBL-TR_Main_Schematron.xml')
-   xslt = etree.XSLT(sch)
-   # compiled — lxml içinde kullanılır
+   import saxonche
+   with saxonche.PySaxonProcessor(license=False) as proc:
+       xslt = proc.new_xslt30_processor()
+       # Üç aşamalı ISO Schematron pipeline:
+       # 1. iso_dsdl_include.xsl  → include birleştir
+       # 2. iso_abstract_expand.xsl → abstract genişlet
+       # 3. iso_svrl_for_xslt2.xsl  → SVRL çıktı üret
+       # GİB paketi zaten derlenmiş .sch.xsl içeriyorsa doğrudan kullanın.
+       result = xslt.transform_to_file(
+           source_file='UBL-TR_Main_Schematron.xml',
+           stylesheet_file='iso_svrl_for_xslt2.xsl',
+           output_file='UBL-TR_Main_Schematron.sch.xsl'
+       )
    "
-   veya schematron derleyici ile compile edin.
-4. Derlenmiş XSLT'yi UBL-TR_Main_Schematron.sch.xsl olarak kaydedin.
+   veya Saxon komut satırı ile:
+   java -jar saxon-he.jar -s:UBL-TR_Main_Schematron.xml \
+        -xsl:iso_svrl_for_xslt2.xsl \
+        -o:UBL-TR_Main_Schematron.sch.xsl
+
+4. Derlenmiş XSLT'yi UBL-TR_Main_Schematron.sch.xsl olarak bu dizine kopyalayın.
