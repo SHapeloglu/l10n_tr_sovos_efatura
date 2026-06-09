@@ -231,6 +231,7 @@ l10n_tr_sovos_efatura/
 | `x_number_status` | Selection | `reserved/confirmed/released` |
 | `x_validation_errors` | Text | Son XSD/Schematron hata detayları |
 | `x_gib_status_code` | Integer | Son GİB durum kodu — durum geçişi takibi |
+| `x_gib_admin_notified` | Boolean | 1215 admin bildirim tek-seferlik kontrolü |
 
 ---
 
