@@ -262,9 +262,13 @@ def validate(xml_bytes):
         return False, 'XSD', errors
 
     # Katman 2: Schematron
-    sch = etree.parse(SCH_PATH)
-    transform = etree.XSLT(sch)
-    result = transform(doc)
+    import saxonche, tempfile
+    with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as f:
+        f.write(xml_bytes); tmp = f.name
+    with saxonche.PySaxonProcessor(license=False) as proc:
+        xslt = proc.new_xslt30_processor()
+        svrl_str = xslt.transform_to_string(source_file=tmp, stylesheet_file=SCH_PATH)
+    svrl_doc = etree.fromstring(svrl_str.encode())
     failures = result.xpath('//svrl:failed-assert',
                            namespaces={'svrl': '...'})
     if failures:

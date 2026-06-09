@@ -15,6 +15,9 @@
         - e-Fatura dashboard
     """,
     'author': 'Geliştirici',
+    'external_dependencies': {
+        'python': ['saxonche'],  # XSLT 2.0 motoru — GİB Schematron zorunlu
+    },
     'depends': ['account', 'mail'],
     'data': [
         'security/ir.model.access.csv',
