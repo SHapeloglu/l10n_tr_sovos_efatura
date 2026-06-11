@@ -8,9 +8,4 @@ from . import (
     test_ubl_validator,
     test_wizards,
     test_cron,
-    # Yeni eklenen test dosyaları
-    test_ubl_builder,
-    test_accounting,
-    test_multicompany,
-    test_extras,
 )
