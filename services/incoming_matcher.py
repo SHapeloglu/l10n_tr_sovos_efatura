@@ -235,7 +235,7 @@ class IncomingMatcher:
     def find_expense_account(self, company):
         """Ürün eşleşemezse genel gider hesabı."""
         return self.env['account.account'].search([
-            ('company_id', '=', company.id),
+            ('company_ids', 'in', company.id),  # Odoo 18: account.account çok şirketli
             ('account_type', '=', 'expense'),
             ('deprecated', '=', False),
         ], limit=1)

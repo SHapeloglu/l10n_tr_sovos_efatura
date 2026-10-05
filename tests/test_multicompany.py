@@ -128,7 +128,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
                 'price_unit': 500.0,
                 'account_id': self.env['account.account'].search([
                     ('account_type', '=', 'income'),
-                    ('company_id', '=', self.company2.id),
+                    ('company_ids', 'in', self.company2.id),
                 ], limit=1).id or self.account_income.id,
             })],
         })

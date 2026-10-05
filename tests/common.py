@@ -185,7 +185,7 @@ class SovosTestCommon(TransactionCase):
         self.account_income = self.env['account.account'].search([
             # Domain filtresi: (alan, operatör, değer) formatında liste
             ('account_type', '=', 'income'),          # gelir tipi hesaplar
-            ('company_id', '=', self.company.id),     # bu şirkete ait
+            ('company_ids', 'in', self.company.id),   # bu şirkete ait (Odoo 18: company_ids)
         ], limit=1)  # sadece 1 kayıt döndür
 
         # ── 5b. Satış Defteri (Journal) ───────────────────────────────────────

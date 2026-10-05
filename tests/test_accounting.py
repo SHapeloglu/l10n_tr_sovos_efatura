@@ -175,7 +175,7 @@ class TestPurchaseAccountingEntry(SovosTestCommon):
         """Alış faturası oluşturur."""
         account_expense = self.env['account.account'].search([
             ('account_type', 'in', ('expense', 'expense_depreciation')),
-            ('company_id', '=', self.company.id),
+            ('company_ids', 'in', self.company.id),
         ], limit=1)
 
         if not account_expense:
@@ -311,7 +311,7 @@ class TestPurchaseAccountingEntry(SovosTestCommon):
 
         account_expense = self.env['account.account'].search([
             ('account_type', 'in', ('expense', 'expense_depreciation')),
-            ('company_id', '=', self.company.id),
+            ('company_ids', 'in', self.company.id),
         ], limit=1)
 
         purchase_journal = self.env['account.journal'].search([
@@ -361,7 +361,7 @@ class TestPurchaseAccountingEntry(SovosTestCommon):
         """
         account_expense = self.env['account.account'].search([
             ('account_type', 'in', ('expense', 'expense_depreciation')),
-            ('company_id', '=', self.company.id),
+            ('company_ids', 'in', self.company.id),
         ], limit=1)
 
         purchase_journal = self.env['account.journal'].search([
