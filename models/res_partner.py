@@ -4,39 +4,44 @@ res_partner.py — Müşteri/Tedarikçi Kart Genişletmesi
 ======================================================
 Odoo'nun res.partner modeline e-Fatura spesifik alanlar ekler.
 
-En kritik özellik: VKN Cache Mekanizması
-    GİB e-Fatura sistemine kayıtlı olup olmadığını belirlemek için
-    her fatura gönderiminde Sovos'a sorgu atmak yetersiz ve yavaştır.
-    Bu yüzden partner kartında cache tutulur:
-      - x_efatura_type: 'efatura' veya 'earsiv'
-      - x_efatura_type_updated: son güncelleme tarihi
+VKN Cache Mekanizması:
+    Partner kartında e-Fatura tipi (efatura/earsiv) 30 gün cache'lenir.
+    Sovos erişilemiyorsa cache değeri kullanılır (iş devam eder).
+    Cache tamamen boşsa ve Sovos erişilemiyorsa → UserError.
 
-    30 günden eski cache otomatik yenilenir (efatura_type_needs_refresh).
-    Sovos erişilemiyorsa cache'deki değer kullanılır (iş devam eder).
-    Cache tamamen boşsa ve Sovos erişilemiyorsa → UserError (iş bloke).
+DÜZELTME — Madde 2 + 9: VKN/TCKN format ve benzersizlik kontrolü.
+    - VKN: tam 10 hane sayısal
+    - TCKN: tam 11 hane sayısal
+    - Ana cariler (parent_id = False): VKN benzersiz olmalı
+    - Alt cariler (şube/adres, parent_id dolu): aynı VKN'i taşıyabilir
+    - Birden fazla ana cari aynı VKN ile kayıtlıysa açık hata verir
+      (limit=1 ile sessizce ilki almak yerine — Madde 6)
 """
 import logging
-from datetime import date, timedelta
+import re
+from datetime import date
 from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
 
 _logger = logging.getLogger(__name__)
 
-# Modül seviyesinde sabitleri tanımlamak daha temiz kod sağlar.
-# Hem burada hem de XML view'larda kullanılabilir (related fields için).
 EFATURA_TYPE_SELECTION = [
-    ('efatura', 'e-Fatura (GİB Kayıtlı)'),   # VKN GİB sisteminde kayıtlı
-    ('earsiv', 'e-Arşiv (GİB Kayıtsız)'),     # VKN kayıtsız veya bireysel müşteri
+    ('efatura', 'e-Fatura (GİB Kayıtlı)'),
+    ('earsiv',  'e-Arşiv (GİB Kayıtsız)'),
 ]
 
 SCENARIO_SELECTION = [
-    ('TICARIFATURA', 'TİCARİFATURA'),   # B2B ticari fatura; alıcı 8 gün içinde kabul/red
-    ('TEMELFATURA', 'TEMELFATURA'),     # B2B basit fatura; yanıt beklenmez
-    ('EARSIVFATURA', 'e-Arşiv Fatura'), # GİB'e kayıtsız alıcı veya bireysel
+    ('TICARIFATURA', 'TİCARİFATURA'),
+    ('TEMELFATURA',  'TEMELFATURA'),
+    ('EARSIVFATURA', 'e-Arşiv Fatura'),
 ]
+
+# VKN: 10 hane sayısal | TCKN: 11 hane sayısal
+_VKN_RE  = re.compile(r'^\d{10}$')
+_TCKN_RE = re.compile(r'^\d{11}$')
 
 
 class ResPartner(models.Model):
-    # _inherit: res.partner tablosuna yeni sütunlar ekliyoruz.
     _inherit = 'res.partner'
 
     x_efatura_type = fields.Selection(
@@ -53,13 +58,11 @@ class ResPartner(models.Model):
         string='Varsayılan Senaryo',
         default='TICARIFATURA',
         # Fatura oluşturulurken bu değer varsayılan olarak kullanılır.
-        # Fatura üzerinde de manuel değiştirilebilir.
     )
     x_vergi_dairesi = fields.Char(
         string='Vergi Dairesi',
         size=50,
         # UBL-TR XML'inde TaxScheme/Name alanına yazılır.
-        # Zorunlu değil ama GİB validasyonunda uyarı verebilir.
     )
     x_efatura_alias = fields.Char(
         string='e-Fatura GB Kodu (alias)',
@@ -73,8 +76,61 @@ class ResPartner(models.Model):
     x_efatura_type_updated = fields.Date(
         string='e-Fatura Tip Güncelleme Tarihi',
         # Cache'in son güncellendiği tarihi tutar.
-        # efatura_type_needs_refresh() bu tarihe bakarak 30 gün kontrolü yapar.
     )
+
+    # ── VKN/TCKN Format ve Benzersizlik Kontrolü ──────────────────────────
+
+    @api.constrains('vat', 'parent_id')
+    def _check_vat_format(self):
+        """
+        DÜZELTME Madde 2 + 9: VKN/TCKN format ve benzersizlik doğrulaması.
+
+        Kurallar:
+          1. VKN: tam 10 hane sayısal (örn: 1234567890)
+          2. TCKN: tam 11 hane sayısal (örn: 12345678901)
+          3. Ana cariler (parent_id = False): VKN benzersiz olmalı
+          4. Alt cariler (şube/adres, parent_id dolu): aynı VKN taşıyabilir
+
+        Madde 6 notu:
+          Birden fazla ana cari aynı VKN ile kayıtlıysa tüm eşleşenler
+          hata mesajında gösterilir. Eski kod limit=1 ile sessizce
+          ilk bulunanı alıyordu; bu artık açık ValidationError olarak yönetilir.
+
+        Neden @api.constrains (DB unique constraint değil)?
+          Odoo'nun vat alanı zaten birçok modelde kullanılıyor.
+          DB constraint koyarsak standart Odoo işlevleri bozulabilir.
+          @api.constrains daha esnek ve Odoo-uyumlu bir yaklaşımdır.
+        """
+        for partner in self:
+            vat = partner.vat
+            if not vat:
+                continue  # Boş VKN/TCKN kabul edilir — zorunlu değil
+
+            # Kural 1+2: Format kontrolü
+            if not (_VKN_RE.match(vat) or _TCKN_RE.match(vat)):
+                raise ValidationError(_(
+                    '"%s" geçersiz VKN/TCKN formatı.\n\n'
+                    '• VKN (Vergi Kimlik No): tam 10 hane sayısal (örn: 1234567890)\n'
+                    '• TCKN (TC Kimlik No): tam 11 hane sayısal (örn: 12345678901)\n\n'
+                    'Harf, boşluk veya özel karakter kabul edilmez.'
+                ) % vat)
+
+            # Kural 3: Ana cari benzersizliği
+            # Alt cariler (parent_id dolu olan şube/adres kartları) aynı VKN'i taşıyabilir.
+            if not partner.parent_id:
+                duplicates = self.search([
+                    ('vat', '=', vat),
+                    ('parent_id', '=', False),
+                    ('id', '!=', partner.id),
+                ])
+                if duplicates:
+                    dup_names = ', '.join(duplicates.mapped('name'))
+                    raise ValidationError(_(
+                        'VKN/TCKN "%s" zaten başka bir ana cariye kayıtlı:\n%s\n\n'
+                        'Her ana carinin VKN/TCKN\'si benzersiz olmalıdır.\n'
+                        'Şube veya adres için önce ana cariyi bulun, '
+                        'ardından alt cari olarak (child) ekleyin.'
+                    ) % (vat, dup_names))
 
     # ── Cache Kontrol Metodları ────────────────────────────────────────────
 
@@ -84,62 +140,45 @@ class ResPartner(models.Model):
 
         Yenileme GEREKİR eğer:
           - x_efatura_type alanı hiç doldurulmamışsa (ilk kez sorgulanacak)
-          - x_efatura_type_updated tarihi yoksa (ne zaman sorgulandığı bilinmiyor)
-          - Son sorgudan bu yana 30+ gün geçmişse (değişmiş olabilir)
-
-        Neden 30 gün?
-          Bir firma GİB'e kayıt yaptırabilir veya kaydını iptal ettirebilir.
-          30 günde bir kontrol: fazla API çağrısı yapmadan güncel kalmak.
+          - x_efatura_type_updated tarihi yoksa
+          - Son sorgudan bu yana 30+ gün geçmişse
 
         Returns: True → yenilenmeli | False → cache geçerli, kullan
         """
-        self.ensure_one()  # Bu metod tek bir partner için çalışır
-
-        # Cache hiç doldurulmamış → mutlaka sorgula
+        self.ensure_one()
         if not self.x_efatura_type:
             return True
         if not self.x_efatura_type_updated:
             return True
-
-        # Cache kaç gün önce güncellendi?
         age = (date.today() - self.x_efatura_type_updated).days
         return age > 30  # 30 günden eskiyse yenile
 
     def refresh_efatura_type(self, company):
         """
         Sovos GetUserList API'sini çağırarak VKN'in GİB'te kayıtlı olup
-        olmadığını sorgular ve sonucu partner kartına kaydeder (cache günceller).
-
-        Parametreler:
-            company (res.company): Hangi şirketin Sovos hesabı kullanılacak?
-                                   Multi-company desteği için gerekli.
+        olmadığını sorgular ve partner kartına kaydeder (cache günceller).
 
         Hata davranışı:
-            Sovos erişilemiyorsa (network hatası, timeout) WARNING loglanır
-            ama exception fırlatılmaz. Mevcut cache değeri korunur.
-            account_move.py'de: cache boşsa UserError, doluysa devam eder.
+            Sovos erişilemiyorsa WARNING loglanır, exception fırlatılmaz.
+            Mevcut cache değeri korunur (iş devam eder).
+            Cache boşsa ve bu metod da başarısız olursa: account_move.py
+            _resolve_efatura_type() içinde 'earsiv' fallback uygulanır.
         """
         self.ensure_one()
         vat = self.vat or ''
         if not vat:
-            # VKN/TCKN girilmemiş → sorgulama yapılamaz
             return
 
         from ..services.sovos_invoice_service import SovosInvoiceService
         try:
             svc = SovosInvoiceService(company)
             is_registered = svc.check_vkn_registered(vat)
-
-            # GİB'te kayıtlı mı? → efatura, değil mi? → earsiv
             new_type = 'efatura' if is_registered else 'earsiv'
-
             self.write({
-                'x_efatura_type': new_type,
-                'x_efatura_type_updated': date.today(),  # Cache tarihini güncelle
+                'x_efatura_type':         new_type,
+                'x_efatura_type_updated': date.today(),
             })
             _logger.info('VKN cache güncellendi: %s → %s', vat, new_type)
-
         except Exception as e:
-            # Sovos'a erişilemedi — mevcut cache değerini koru, iş durmasın
             _logger.warning('VKN sorgusu başarısız (%s): %s', vat, e)
             # Exception yukarıya fırlatılmaz; caller mevcut değeri kullanır

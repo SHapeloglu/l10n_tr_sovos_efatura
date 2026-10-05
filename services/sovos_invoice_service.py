@@ -28,7 +28,6 @@ import base64
 import hashlib
 import io
 import logging
-from xml.sax.saxutils import escape
 import zipfile
 from datetime import datetime
 
@@ -39,7 +38,7 @@ _logger = logging.getLogger(__name__)
 
 # SOAP endpoint'leri — test ve üretim ortamı
 WSDL_PROD = 'https://efatura.fitbulut.com/eInvoice/services/EInvoiceApplication?wsdl'
-WSDL_TEST = 'https://efatura-test.fitbulut.com/eInvoice/services/EInvoiceApplication?wsdl'
+WSDL_TEST = 'https://efaturawstest.fitbulut.com/ClientEInvoiceServices/ClientEInvoiceServicesPort.svc'
 
 # SOAP standart namespace
 SOAP_NS = 'http://schemas.xmlsoap.org/soap/envelope/'
@@ -64,9 +63,8 @@ class SovosInvoiceService:
         test_mode=True iken test endpoint kullanılır; GİB'e iletim yapılmaz.
         """
         self.company = company
-        # SOAP gövdesine %s ile yazıldığı için XML'e kaçışlanır (& < > şifreyi bozmasın)
-        self.user         = escape(company.x_sovos_invoice_user or '')
-        self.password     = escape(company.x_sovos_invoice_pass or '')
+        self.user         = company.x_sovos_invoice_user
+        self.password     = company.x_sovos_invoice_pass
         self.sender_vkn   = company.x_sovos_sender_vkn
         self.identifier   = company.x_sovos_identifier   # Posta kutusu (GB kodu)
         self.test_mode    = company.x_sovos_test_mode
@@ -364,12 +362,18 @@ class SovosInvoiceService:
             })
         return responses
 
-    def get_inbound_list(self):
+    def get_inbound_list(self, date_from, date_to):
         """
         Sovos posta kutusuna gelen faturaları listeler.
 
-        Type=INBOUND: Bize gönderilen (alış) faturalar.
-        sovos_sync.py'de gelen faturaları Odoo'ya aktarmak için kullanılır.
+        SSS S3 / S10: GetUblList maksimum 1 günlük tarih aralığı destekler.
+        Bu metod tek bir günü sorgular; birden fazla gün için sovos_sync.py
+        her günü ayrı çağrı yaparak chunk'lar (günlük döngü).
+
+        Args:
+            date_from (date): Sorgu başlangıç tarihi (dahil)
+            date_to   (date): Sorgu bitiş tarihi (dahil), date_from ile aynı
+                              veya en fazla 1 gün sonrası olmalı.
 
         Returns: list[dict] — [{'uuid': '...', 'sender_vkn': '...', 'invoice_date': '...'}, ...]
         """
@@ -384,10 +388,14 @@ class SovosInvoiceService:
             '<ein:PASSWORD>%s</ein:PASSWORD>'
             '<ein:VKNTCKN>%s</ein:VKNTCKN>'
             '<ein:Type>INBOUND</ein:Type>'
+            '<ein:FromDate>%s</ein:FromDate>'
+            '<ein:ToDate>%s</ein:ToDate>'
             '</ein:GetUblList>'
         ) % (
             datetime.now().strftime('%Y%m%d%H%M%S'),
             self.user, self.password, self.sender_vkn,
+            date_from.strftime('%Y-%m-%d'),
+            date_to.strftime('%Y-%m-%d'),
         )
         root = self._post('GetUblList', body)
         invoices = []
@@ -398,6 +406,29 @@ class SovosInvoiceService:
                 'invoice_date': self._el_text(inv_el, 'INVOICE_DATE'),
             })
         return invoices
+
+    def get_invoice_ubl(self, uuid):
+        """
+        Gelen faturanın UBL-TR XML içeriğini Sovos'tan çeker.
+        Madde 5 Faz 2: Tam parse için ham XML gerekli.
+        Returns: bytes (UTF-8 XML)
+        """
+        body = (
+            '<ein:GetUBL>'
+            '<ein:REQUEST_HEADER><ein:SESSION_ID/>'
+            '<ein:CLIENT_TXN_ID>UBL_%s</ein:CLIENT_TXN_ID>'
+            '<ein:COMPRESSED>N</ein:COMPRESSED></ein:REQUEST_HEADER>'
+            '<ein:USERNAME>%s</ein:USERNAME>'
+            '<ein:PASSWORD>%s</ein:PASSWORD>'
+            '<ein:VKNTCKN>%s</ein:VKNTCKN>'
+            '<ein:UUID>%s</ein:UUID>'
+            '<ein:DocType>INVOICE</ein:DocType>'
+            '</ein:GetUBL>'
+        ) % (uuid, self.user, self.password, self.sender_vkn, uuid)
+        root = self._post('GetUBL', body)
+        b64 = self._extract_text(root, 'DocData') or ''
+        import base64
+        return base64.b64decode(b64) if b64 else b''
 
     def get_invoice_pdf(self, uuid):
         """

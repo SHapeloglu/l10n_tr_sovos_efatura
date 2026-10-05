@@ -7,3 +7,8 @@ __pycache__/
 .idea/
 *.swp
 .DS_Store
+
+# GİB şema dosyaları repoya alınmaz; sunucuda setup_schemas.sh ile kurulur.
+# (services/schemas/VERSION izlenir)
+services/schemas/*
+!services/schemas/VERSION

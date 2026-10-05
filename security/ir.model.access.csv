@@ -4,3 +4,7 @@ access_sovos_sync_manager,sovos.sync manager,model_sovos_sync,account.group_acco
 access_resend_wizard_user,resend wizard user,model_sovos_resend_invoice_wizard,account.group_account_user,1,1,1,1
 access_cancel_wizard_user,cancel wizard user,model_sovos_cancel_invoice_wizard,account.group_account_user,1,1,1,1
 access_kurfarki_wizard_user,kurfarki wizard user,model_sovos_kur_farki_wizard,account.group_account_user,1,1,1,1
+access_efatura_product_mapping_user,efatura product mapping user,model_efatura_product_mapping,account.group_account_user,1,0,0,0
+access_efatura_product_mapping_manager,efatura product mapping manager,model_efatura_product_mapping,account.group_account_manager,1,1,1,1
+access_incoming_match_wizard,incoming match wizard,model_sovos_incoming_match_wizard,account.group_account_user,1,1,1,1
+access_incoming_match_wizard_line,incoming match wizard line,model_sovos_incoming_match_wizard_line,account.group_account_user,1,1,1,1

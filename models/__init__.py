@@ -24,3 +24,4 @@ from . import product_uom
 #x_ubl_code — GİB'in istediği UN/CEFACT kodu (C62, KGM vb.).
 from . import account_move
 from . import sovos_sync
+from . import efatura_product_mapping

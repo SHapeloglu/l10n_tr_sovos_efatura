@@ -3,12 +3,12 @@
 **Odoo 18 Community × Sovos e-Fatura / e-Arşiv Entegrasyon Modülü**
 
 [![Odoo](https://img.shields.io/badge/Odoo-18.0%20Community-714B67?logo=odoo)](https://www.odoo.com)
-[![Versiyon](https://img.shields.io/badge/Versiyon-6.0--Final-brightgreen)](.)
+[![Versiyon](https://img.shields.io/badge/Versiyon-8.0-brightgreen)](.))
 [![Lisans](https://img.shields.io/badge/Lisans-LGPL--3-blue)](LICENSE)
 [![GİB](https://img.shields.io/badge/GİB-UBL--TR%202.1-orange)](https://ebelge.gib.gov.tr)
 
-> **Teknik Entegrasyon Spesifikasyonu v6.0 — Haziran 2026 — Final**  
-> Satış + Alış + Muhasebe + PDF Arşivi + Kur Farkı + XSD/Schematron Validasyon + Atomik Fatura Numarası
+> **Teknik Entegrasyon Spesifikasyonu v8.0 — Haziran 2026**  
+> Satış + Alış + Muhasebe + PDF Arşivi + Kur Farkı + XSD/GİB İş Kuralı Validasyon + Atomik Fatura Numarası
 
 ---
 
@@ -44,10 +44,10 @@ Bu modül, **Odoo 18 Community** üzerinde çalışan işletmelerin **Sovos** (G
 | **Odoo Sürümü** | 18.0-20260528 Community (self-hosted) |
 | **Entegratör** | Sovos — GİB Özel Entegratörü |
 | **Modül Adı** | `l10n_tr_sovos_efatura` |
-| **Spesifikasyon** | v6.0 — Haziran 2026 — Final |
-| **v5 → v6 Yenilikleri** | XSD/Schematron validasyon, tam GİB durum kodu listesi, atomik fatura numarası, 1103/1104 akışı, cron başarısızlık bildirimi |
+| **Spesifikasyon** | v8.0 — Haziran 2026 |
+| **v6 → v8 Yenilikleri** | saxonche bağımlılığı kaldırıldı; XSD (lxml) + GİB iş kuralları (XPath) validasyon; schemas/ dizin yapısı güncellendi |
 
-> **Sektör Referansları:** Logo Tiger, Mikro, ETA ve Vega kapsamlı araştırılmış; kritik alanlarda (Schematron validasyon, atomik numara, cron bildirimi) sektörden daha güvenli yaklaşımlar benimsenmiştir.
+> **Sektör Referansları:** Logo Tiger, Mikro, ETA ve Vega kapsamlı araştırılmış; kritik alanlarda (validasyon, atomik numara, cron bildirimi) sektörden daha güvenli yaklaşımlar benimsenmiştir.
 
 ---
 
@@ -70,7 +70,7 @@ Bu modül, **Odoo 18 Community** üzerinde çalışan işletmelerin **Sovos** (G
 | 13 | **e-Fatura Dashboard** | Durum bazlı filtrelenmiş görünümler |
 | 14 | **Fatura Önizleme** | Gönderim öncesi HTML render + validasyon |
 | 15 | **Bağlantı Testi** | InvoiceService + ArchiveService test butonu |
-| 16 | **UBL-TR Validasyon** | Gönderim öncesi XSD + Schematron — Logo Tiger yaklaşımı |
+| 16 | **UBL-TR Validasyon** | Gönderim öncesi XSD + GİB iş kuralları — ek bağımlılık yok |
 | 17 | **Atomik Fatura Numarası** | Numara çakışma riski sıfır — rezervasyon mekanizması |
 | 18 | **Cron Başarısızlık Bildirimi** | Cron çökmesi → admin bildirimi |
 
@@ -100,7 +100,7 @@ Aşağıdaki özellikler farklı GİB servisi veya farklı yasal süreç gerekti
 | Katman | Bileşen | Rol |
 |---|---|---|
 | ERP | Odoo 18 Community | Fatura, muhasebe, VKN cache, dashboard, validasyon |
-| Adaptör | `l10n_tr_sovos_efatura` | UBL-TR, API, XSD/Schematron, atomik numara, durum |
+| Adaptör | `l10n_tr_sovos_efatura` | UBL-TR, API, XSD/iş kuralları, atomik numara, durum |
 | Entegratör | Sovos Bulut | İmzalama, GİB iletimi, e-posta, PDF, 10 yıl saklama |
 | Yasal Otorite | GİB | Mükellef listesi, teslim, onay/red |
 
@@ -118,7 +118,7 @@ action_post() (tekil) VEYA 'Toplu Gönder' (çoklu)
   ── UBL-TR VALİDASYON ──
   → ubl_builder.build(invoice, uuid, numara)
   → xsd_validate(xml)        → hata varsa numara SERBEST, inline bant, dur
-  → schematron_validate(xml) → hata varsa numara SERBEST, inline bant, dur
+  → gib_rules_validate(xml)  → hata varsa numara SERBEST, inline bant, dur
   ────────────────────────────────
   → {uuid}.xml → {uuid}.zip → base64
   → e-Fatura:  InvoiceService.SendUBL()
@@ -136,7 +136,7 @@ action_post() (tekil) VEYA 'Toplu Gönder' (çoklu)
 
 - Odoo 18.0 Community (self-hosted)
 - Python 3.10+
-- `lxml` kütüphanesi (XSD + Schematron validasyon)
+- `lxml` kütüphanesi — Odoo'nun standart bağımlılığıdır, ayrıca kurulum gerekmez
 
 ### Adımlar
 
@@ -145,12 +145,28 @@ action_post() (tekil) VEYA 'Toplu Gönder' (çoklu)
    cp -r l10n_tr_sovos_efatura /opt/odoo/addons/
    ```
 
-2. GİB şema dosyalarını yerleştirin (`services/schemas/` dizinine):
-   - `UBL-Invoice-2.1.xsd`
-   - `UBL-TR_Main_Schematron.sch.xsl` (pre-compiled XSLT)
-   - `VERSION` (şema versiyon takibi)
+2. GİB şema dosyalarını kurun (iki GİB zip paketi gerekir):
 
-   > Şema dosyaları: https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaket.zip
+   ```bash
+   cd /opt/odoo/addons/l10n_tr_sovos_efatura
+   bash setup_schemas.sh UBL-TR1.2.1_Paketi.zip e-FaturaPaketi.zip
+   ```
+
+   Script iki paketi indirilmemişse manuel indirin:
+   - `UBL-TR1.2.1_Paketi.zip` → https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/UBL-TR1.2.1_Paketi.zip
+   - `e-FaturaPaketi.zip` → https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaketi.zip
+
+   Script şu yapıyı oluşturur:
+   ```
+   services/schemas/
+   ├── maindoc/
+   │   └── UBL-Invoice-2.1.xsd
+   ├── common/
+   │   └── (14 bağımlı XSD dosyası)
+   ├── UBL-TR_Main_Schematron.xml
+   ├── UBL-TR_Common_Schematron.xml
+   └── UBL-TR_Codelist.xml
+   ```
 
 3. Odoo'yu yeniden başlatın ve modülü yükleyin:
    ```bash
@@ -182,6 +198,7 @@ Yapılandırma sayfasında iki ayrı **"Test Et"** butonu mevcuttur:
 ```
 l10n_tr_sovos_efatura/
 ├── __manifest__.py
+├── setup_schemas.sh            # Şema kurulum scripti
 ├── models/
 │   ├── account_move.py         # action_post, atomik numara, toplu gönderim, önizleme
 │   ├── res_company.py          # Sovos credentials + ayarlar + bağlantı testi
@@ -192,11 +209,15 @@ l10n_tr_sovos_efatura/
 │   ├── sovos_invoice_service.py
 │   ├── sovos_archive_service.py
 │   ├── ubl_builder.py
-│   ├── ubl_validator.py        # XSD + Schematron validasyon
-│   └── schemas/                # GİB şema dosyaları
-│       ├── UBL-Invoice-2.1.xsd
-│       ├── UBL-TR_Main_Schematron.sch.xsl  # Pre-compiled XSLT
-│       └── VERSION             # Şema versiyon takibi
+│   ├── ubl_validator.py        # XSD + GİB iş kuralları validasyon
+│   └── schemas/                # GİB şema dosyaları (setup_schemas.sh ile kurulur)
+│       ├── maindoc/
+│       │   └── UBL-Invoice-2.1.xsd
+│       ├── common/
+│       │   └── (14 bağımlı XSD dosyası)
+│       ├── UBL-TR_Main_Schematron.xml
+│       ├── UBL-TR_Common_Schematron.xml
+│       └── UBL-TR_Codelist.xml
 ├── wizards/
 │   ├── resend_invoice_wizard.py
 │   ├── cancel_invoice_wizard.py
@@ -229,7 +250,7 @@ l10n_tr_sovos_efatura/
 | `x_kur_farki` | Boolean | Kur farkı faturası işareti |
 | `x_reserved_number` | Char(50) | Rezerve edilen fatura numarası |
 | `x_number_status` | Selection | `reserved/confirmed/released` |
-| `x_validation_errors` | Text | Son XSD/Schematron hata detayları |
+| `x_validation_errors` | Text | Son XSD/iş kuralı hata detayları |
 | `x_gib_status_code` | Integer | Son GİB durum kodu — durum geçişi takibi |
 | `x_gib_admin_notified` | Boolean | 1215 admin bildirim tek-seferlik kontrolü |
 
@@ -238,56 +259,70 @@ l10n_tr_sovos_efatura/
 ## 🔍 UBL-TR Validasyon
 
 GİB'e göndermeden önce **iki katmanlı zorunlu validasyon** uygulanır.
+Ek bağımlılık gerekmez; her şey `lxml` ile çalışır.
 
 ### Validasyon Katmanları
 
 | Katman | Araç | Ne Yakalar? |
 |---|---|---|
 | 1. XSD | `lxml.etree.XMLSchema` | Zorunlu alan eksikliği, veri tipi hatası, hatalı namespace, tag hiyerarşisi |
-| 2. Schematron | `lxml` + GİB Schematron dosyası | İş kuralı ihlalleri: tutar tutarsızlığı, oranlar, senaryo uyumsuzluğu |
+| 2. GİB İş Kuralları | `lxml` XPath | ID formatı, UUID, tarih, ProfileID, VKN/TCKN, InvoiceTypeCode, para birimi, kural kombinasyonları |
 
 ```python
-# services/ubl_validator.py
+# services/ubl_validator.py (özet)
 from lxml import etree
-import os
 
-XSD_PATH = os.path.join(os.path.dirname(__file__), 'schemas/UBL-Invoice-2.1.xsd')
-SCH_PATH = os.path.join(os.path.dirname(__file__), 'schemas/UBL-TR_Main_Schematron.sch.xsl')  # Pre-compiled XSLT
+XSD_PATH = 'services/schemas/maindoc/UBL-Invoice-2.1.xsd'
 
 def validate(xml_bytes):
+    doc = etree.fromstring(xml_bytes)
+
     # Katman 1: XSD
     xsd = etree.XMLSchema(etree.parse(XSD_PATH))
-    doc = etree.fromstring(xml_bytes)
     if not xsd.validate(doc):
-        errors = [str(e) for e in xsd.error_log]
-        return False, 'XSD', errors
+        return False, 'XSD', [str(e) for e in xsd.error_log]
 
-    # Katman 2: Schematron
-    import saxonche, tempfile
-    with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as f:
-        f.write(xml_bytes); tmp = f.name
-    with saxonche.PySaxonProcessor(license=False) as proc:
-        xslt = proc.new_xslt30_processor()
-        svrl_str = xslt.transform_to_string(source_file=tmp, stylesheet_file=SCH_PATH)
-    svrl_doc = etree.fromstring(svrl_str.encode())
-    failures = result.xpath('//svrl:failed-assert',
-                           namespaces={'svrl': '...'})
-    if failures:
-        errors = [f.get('test') + ': ' + f.text for f in failures]
+    # Katman 2: GİB İş Kuralları (XPath)
+    errors = _check_gib_rules(doc)
+    if errors:
         return False, 'SCHEMATRON', errors
 
     return True, None, []
 ```
+
+### Uygulanan GİB İş Kuralları
+
+GİB'in `UBL-TR_Common_Schematron.xml` dosyasındaki `inv:Invoice` context'li
+kurallar XPath ile implement edilmiştir:
+
+| Kural | Kaynak |
+|---|---|
+| ID formatı: `ABC2026000000001` (16 karakter) | `InvoiceIDCheck` |
+| UUID: 36 karakter, v4 formatı | `UUIDCheck` |
+| UBLVersionID: `2.1` | `UBLVersionIDCheck` |
+| CustomizationID: `TR1.2` veya `TR1.2.1` | `CustomizationIDCheck` |
+| ProfileID: geçerli GİB değer listesi | `ProfileIDCheck` |
+| IssueDate: geçmiş tarih, 2005-01-01 sonrası | `InvoiceIDCheck` |
+| InvoiceTypeCode: geçerli değer listesi | `InvoiceTypeCodeCheck` |
+| IADE + ProfileID kombinasyon kuralı | `InvoiceTypeCodeCheck` |
+| DocumentCurrencyCode: ISO 4217 | `CurrencyCodeCheck` |
+| Satıcı VKN/TCKN: 10 veya 11 hane sayısal | Supplier check |
+| TICARIFATURA'da alıcı VKN zorunlu | Party check |
+| CopyIndicator: `false` | `CopyIndicatorCheck` |
+| En az bir InvoiceLine zorunlu | — |
+| LineExtensionAmount = Qty × Price | — |
 
 ### Validasyon Hata Yönetimi
 
 | Hata Türü | GİB Kodu Karşılığı | Odoo Davranışı |
 |---|---|---|
 | XSD hatası | 1101, 1132, 1160 | Numara serbest, inline kırmızı bant, teknik detay logda |
-| Schematron hatası | 1150, 1170 | Numara serbest, inline kırmızı bant, kural adı gösterilir |
+| GİB iş kuralı ihlali | 1150, 1170 | Numara serbest, inline kırmızı bant, kural adı gösterilir |
 | Validasyon geçti | — | Sovos'a iletim başlar |
 
-> **Şema Güncellemeleri:** GİB XSD ve Schematron dosyaları `services/schemas/` dizininde saklanır. GİB şema güncellemelerinde (yılda 1-2 kez) modül versiyonu yükseltilir ve Odoo güncelleme süreciyle otomatik dağıtılır.
+> **Şema Güncellemeleri:** GİB XSD dosyaları `services/schemas/` dizininde saklanır.
+> GİB şema güncellemelerinde (yılda 1-2 kez) `setup_schemas.sh` yeniden çalıştırılır;
+> Schematron kuralları `ubl_validator.py` içindedir, XSD ile birlikte güncellenir.
 
 ---
 
@@ -299,7 +334,7 @@ Ağ kesintisi senaryolarında numara çakışmasını (GİB hata kodu 1104) önl
 # models/account_move.py — action_post() override
 def action_post(self):
     # 1. Numara REZERVE et (DB'de kilitli)
-    with self.env.cr.savepoint():  # PostgreSQL savepoint
+    with self.env.cr.savepoint():
         invoice_number = self.env['ir.sequence'].next_by_id(
             self.company_id.x_invoice_sequence_id.id
         )
@@ -317,11 +352,11 @@ def action_post(self):
     # 3. Sovos'a gönder
     try:
         result = self._send_to_sovos(xml, uuid)
-        self.write({'name': invoice_number,       # ONAY
+        self.write({'name': invoice_number,
                     'x_sovos_uuid': uuid,
                     'x_number_status': 'confirmed'})
     except Exception as e:
-        self._release_number(invoice_number)      # SERBEST bırak
+        self._release_number(invoice_number)
         raise UserError(f'Sovos gönderim hatası: {e}')
 ```
 
@@ -333,7 +368,7 @@ def action_post(self):
 | `confirmed` | Sovos'a başarıyla iletildi | Kalıcı — değiştirilemez |
 | `released` | Hata nedeniyle serbest bırakıldı | Sequence sayacı geri alınır* |
 
-> **Not:** PostgreSQL sequence monoton artar — geri alınamaz. Serbest bırakılan numara "boş" kalır (VUK md.231 uyarınca normaldir). Sistem bu boşluğu loglar ve admin raporuna ekler.
+> **Not:** PostgreSQL sequence monoton artar — geri alınamaz. Serbest bırakılan numara "boş" kalır (VUK md.231 uyarınca normaldir).
 
 ---
 
@@ -353,11 +388,8 @@ def action_post(self):
 
 - Fatura formunda **"Faturayı Önizle"** butonu (POSTED, henüz gönderilmemiş)
 - `ubl_builder.build()` çalışır — geçici UUID, GİB'e iletim yok
-- XSD + Schematron validasyon çalışır — hata varsa **önizlemede gösterilir**
+- XSD + GİB iş kuralı validasyon çalışır — hata varsa **önizlemede gösterilir**
 - UBL-TR XML → HTML render → Odoo modal içinde gösterilir
-- "Kapat" veya "Gönder" butonu
-
-> **Sektörden İyi:** Logo Tiger'da önizleme portal bağlantısı gerektirir. Bu modülde internet bağlantısı olmadan Odoo içinde çalışır; validasyon hataları önizlemede gösterilir.
 
 ---
 
@@ -390,7 +422,7 @@ def action_post(self):
 | 1130 | ZIP açılamadı | ZIP yeniden oluştur + tekrar gönder |
 | 1133 | Zarf ID ve XML adı uyuşmuyor | UUID kontrolü + tekrar gönder |
 | 1143 | Geçersiz versiyon | UBLVersionID kontrol (2.1) + tekrar gönder |
-| 1150 | Schematron kontrol hatalı | Schematron log + fatura düzelt + tekrar gönder |
+| 1150 | Schematron kontrol hatalı | GİB iş kuralı log + fatura düzelt + tekrar gönder |
 | 1160 | XML şema kontrolünden geçemedi | XSD log + fatura düzelt + tekrar gönder |
 | 1163 | Zarf sistemde kayıtlı — mükerrer UUID | ⚠️ İptal + yeni fatura |
 | 1210 | Alıcıda işlenemedi (1. deneme) | Aynı UUID tekrar gönder — iptal gerekmez |
@@ -454,8 +486,6 @@ Onay → status='cancelled' — sorumluluk kullanıcıya ait
 | 8 Gün Uyarısı | Günlük | Admin bildirim | Günlük kontrol yeterli |
 | VKN Cache Güncelleme | Günlük | Admin bildirim | 30 gün filtreli |
 
-> **Sektörden İyi:** Logo Tiger'da cron hataları ayrı log ekranında gösterilir. Bu modülde cron hatası anında Odoo admin bildirimine düşer.
-
 ---
 
 ## 🔐 Güvenlik
@@ -467,7 +497,7 @@ Onay → status='cancelled' — sorumluluk kullanıcıya ait
 - Çok şirket: `with_company()` izolasyonu
 - KVKK: staging ortamında VKN/ad-soyad anonimleştirilmeli
 - API hata yanıtları: özet loglanır, kimlik bilgisi loglanmaz
-- Schematron hata detayları: `x_validation_errors` alanında — sadece admin görür
+- GİB iş kuralı hata detayları: `x_validation_errors` alanında — sadece admin görür
 - Atomik numara rezervasyon logu: admin raporuna dahil
 
 ---
@@ -483,7 +513,7 @@ Test ortamında `x_sovos_test_mode=True` — GİB iletimi yapılmaz. VKN'ler KVK
 |---|---|---|---|
 | 1 | Bağlantı testi — doğru credentials | Yeşil bildirim | Bildirim rengi |
 | 2 | XSD validasyon — zorunlu alan eksik | Hata bandı, numara serbest | `x_number_status=released` |
-| 3 | Schematron validasyon — kural ihlali | Hata bandı + kural adı | `x_validation_errors` |
+| 3 | GİB iş kuralı — hatalı ID formatı | Hata bandı + kural adı | `x_validation_errors` |
 | 4 | Validasyon geçen fatura | Sovos'a iletilir | `x_sovos_uuid` dolu |
 | 5 | Fatura önizleme — validasyon hatası | Önizlemede hata gösterilir | Modal hata içeriği |
 | 6 | Atomik numara — ağ kesintisi sim | Numara serbest, hata bandı | `x_number_status=released` |
@@ -527,7 +557,8 @@ Test ortamında `x_sovos_test_mode=True` — GİB iletimi yapılmaz. VKN'ler KVK
 | Sovos API | https://api.fitbulut.com/servis/#/eFatura |
 | Sovos e-Fatura WS v2.3 | https://api.fitbulut.com/servis/assets/docs/Sovos%20Bulut%20e-Fatura%20WS%20API%20v2.3.zip |
 | Sovos e-Arşiv WS v2.3 | https://api.fitbulut.com/servis/assets/docs/Sovos%20Bulut%20e-Arsiv%20Fatura%20WS%20API%20v2.3.zip |
-| GİB e-Fatura Paketi (XSD+Schematron) | https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaket.zip |
+| GİB UBL-TR Paketi (XSD) | https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/UBL-TR1.2.1_Paketi.zip |
+| GİB e-Fatura Paketi (Schematron) | https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaketi.zip |
 | 589 Sıra VUK Tebliği | 31.12.2025 tarih 33124 sayılı RG — e-Arşiv 2026 sınırları |
 | GİB e-Belge | https://ebelge.gib.gov.tr |
 | Logo Tiger Durum Kodları | https://www.logohizmetmerkezi.com/destek-dokumanlari/logo-e-fatura-hatasi-ve-cozumu.html |
@@ -539,8 +570,8 @@ Test ortamında `x_sovos_test_mode=True` — GİB iletimi yapılmaz. VKN'ler KVK
 <div align="center">
 
 **Odoo 18 Community × Sovos e-Fatura Entegrasyon Modülü**  
-v6.0 — Haziran 2026 — Final  
+v8.0 — Haziran 2026
 
-*Logo Tiger, Mikro, ETA ve Vega karşılaştırması + tam GİB durum kodu listesi + XSD/Schematron validasyon + atomik numara*
+*Logo Tiger, Mikro, ETA ve Vega karşılaştırması + tam GİB durum kodu listesi + XSD/iş kuralı validasyon + atomik numara*
 
 </div>

@@ -14,9 +14,83 @@ Güvenlik:
     Kullanıcı adı/şifre alanları groups='base.group_system' ile korunmuştur.
     Yani sadece sistem yöneticileri bu alanları görebilir.
 """
+import base64
 import logging
+import os
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
+
+# ── Uygulama Katmanı Şifreleme (Madde 1) ──────────────────────────────────────
+# Odoo Community'de built-in DB şifreleme yok. Enterprise Vault gerektirir.
+# Çözüm: şifreler DB'ye yazılmadan önce AES-128 (Fernet) ile şifrelenir.
+# Anahtar: SOVOS_CRYPT_KEY ortam değişkeninden okunur (32-byte, base64 URL-safe).
+# Üretimde: export SOVOS_CRYPT_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+# Anahtar yoksa: şifreleme ATLANIR, yalnızca uyarı loglanır (mevcut davranış korunur).
+# cryptography paketi Odoo kurulumunda zaten vardır (oidc, saml vb. bağımlılıkları).
+
+_CRYPT_PREFIX = b'fernet1:'  # Şifreli değerleri düz metinden ayırt eder
+
+
+def _get_fernet():
+    """
+    SOVOS_CRYPT_KEY env değişkeninden Fernet nesnesi döndürür.
+    Anahtar yoksa veya geçersizse None döner (şifreleme devre dışı).
+    """
+    try:
+        from cryptography.fernet import Fernet
+        key = os.environ.get('SOVOS_CRYPT_KEY', '').encode()
+        if not key:
+            return None
+        return Fernet(key)
+    except Exception as e:
+        _logger.warning('Sovos şifreleme: Fernet başlatılamadı — %s', e)
+        return None
+
+
+def _encrypt_password(plain_text):
+    """
+    Düz metin şifreyi Fernet ile şifreler.
+    Fernet nesnesi yoksa düz metni döndürür (anahtar tanımlı değilse).
+    Zaten şifreli ise (prefix kontrolü) tekrar şifrelemez.
+    """
+    if not plain_text:
+        return plain_text
+    f = _get_fernet()
+    if f is None:
+        return plain_text
+    # Zaten şifreli mi?
+    try:
+        raw = plain_text.encode() if isinstance(plain_text, str) else plain_text
+        if raw.startswith(_CRYPT_PREFIX):
+            return plain_text  # çift şifrelemeyi önle
+    except Exception:
+        pass
+    token = f.encrypt(plain_text.encode())
+    return (_CRYPT_PREFIX + token).decode()
+
+
+def _decrypt_password(cipher_text):
+    """
+    Fernet ile şifreli değeri çözer.
+    Prefix yoksa düz metin gibi muamele edilir (migration öncesi eski kayıtlar).
+    """
+    if not cipher_text:
+        return cipher_text
+    try:
+        raw = cipher_text.encode() if isinstance(cipher_text, str) else cipher_text
+        if not raw.startswith(_CRYPT_PREFIX):
+            return cipher_text  # prefix yok → eski düz metin kayıt
+        f = _get_fernet()
+        if f is None:
+            return cipher_text
+        token = raw[len(_CRYPT_PREFIX):]
+        return f.decrypt(token).decode()
+    except Exception as e:
+        _logger.error('Sovos şifre çözme hatası: %s', e)
+        return cipher_text  # hata durumunda mevcut değeri boz değil
 
 _logger = logging.getLogger(__name__)
 
@@ -35,11 +109,19 @@ class ResCompany(models.Model):
         # Ekranlardan ve raporlardan gizlenir.
         groups='base.group_system',
     )
+    # Madde 1: Şifre alanları DB'ye Fernet (AES-128) ile şifreli yazılır.
+    # Ham sütun _enc suffix'li; kullanıcıya/servise gösterilen alan compute/inverse ile çözülür.
+    # Anahtar: SOVOS_CRYPT_KEY ortam değişkeni (bkz. dosya başı). Anahtar yoksa plain-text davranış korunur.
+    x_sovos_invoice_pass_enc = fields.Char(
+        string='e-Fatura Şifresi (Şifreli Ham)',
+        groups='base.group_system',
+        copy=False,
+    )
     x_sovos_invoice_pass = fields.Char(
         string='e-Fatura Şifresi',
         groups='base.group_system',
-        # NOT: Gerçek üretimde bu alan şifrelenmiş saklanmalıdır.
-        # Odoo Community'de encrypt özelliği yoktur; Enterprise'da Vault kullanılabilir.
+        compute='_compute_invoice_pass',
+        inverse='_inverse_invoice_pass',
     )
     x_sovos_sender_vkn = fields.Char(
         string='Gönderici VKN',
@@ -67,9 +149,16 @@ class ResCompany(models.Model):
         groups='base.group_system',
         # e-Fatura kullanıcısından farklı olabilir; Sovos hesabınıza bağlı.
     )
+    x_sovos_archive_pass_enc = fields.Char(
+        string='e-Arşiv Şifresi (Şifreli Ham)',
+        groups='base.group_system',
+        copy=False,
+    )
     x_sovos_archive_pass = fields.Char(
         string='e-Arşiv Şifresi',
         groups='base.group_system',
+        compute='_compute_archive_pass',
+        inverse='_inverse_archive_pass',
     )
     x_sovos_template_id = fields.Char(
         string='Sovos Şablon ID',
@@ -82,19 +171,63 @@ class ResCompany(models.Model):
     x_sovos_test_mode = fields.Boolean(
         string='Test Modu (GİB\'e İletilmez)',
         default=True,
-        # UYARI: Test modu True iken faturalar GİB'e GÖNDERİLMEZ.
-        # Geliştirme/test ortamında True, üretimde mutlaka False yapılmalıdır.
-        # Sovos'un test endpoint'ine gider: efatura-test.fitbulut.com
+        # DÜZELTME Madde 11: Alan adı 'test_mode' yanıltıcı olabilir.
+        # Doğru okuma: True = TEST ortamı (GİB'e GÖNDERİLMEZ)
+        #              False = ÜRETİM ortamı (gerçek GİB iletimi)
+        # x_sovos_live_mode veya x_sovos_production_ready daha net olurdu;
+        # mevcut verilerle geriye dönük uyumluluk nedeniyle korundu.
+        # Üretime geçerken bu alanı MUTLAKA False yapın.
+        # Test endpoint:  efatura-test.fitbulut.com
+        # Prod endpoint:  efatura.fitbulut.com
     )
     x_sovos_admin_email = fields.Char(
         string='Hata Bildirim E-postası',
         # Cron görevleri başarısız olduğunda (ör: GİB erişim sorunu) bu adrese
         # e-posta gönderilir. Boş bırakılırsa sadece Odoo içi bildirim yapılır.
     )
+    x_sovos_last_fetch_date = fields.Date(
+        string='Son Gelen Fatura Sorgu Tarihi',
+        help=(
+            'Sovos GetUblList son başarılı sorgu tarihi.\n'
+            'SSS S3/S10: GetUblList max 1 günlük tarih aralığı destekler.\n'
+            'Cron bu tarihten bugüne kadar günlük chunk\'larla sorgular.\n'
+            'Boş → ilk çalışmada son 7 gün (VUK limiti) taranır.'
+        ),
+    )
 
     # ── Bağlantı Test Metodları ────────────────────────────────────────────
     # Bu metodlar şirket ayarları formundaki "Bağlantıyı Test Et" butonlarına bağlıdır.
     # XML view'da type="object" butonu bu metodları çağırır.
+
+    # ── Şifre Compute / Inverse Metodları (Madde 1) ──────────────────────────
+
+    @api.depends('x_sovos_invoice_pass_enc')
+    def _compute_invoice_pass(self):
+        """
+        DB'deki şifreli değeri çözüp x_sovos_invoice_pass alanına yazar.
+        SOVOS_CRYPT_KEY tanımlı değilse enc alanının değerini olduğu gibi döner
+        (migration öncesi eski kayıtlarla geriye dönük uyumluluk).
+        """
+        for rec in self:
+            rec.x_sovos_invoice_pass = _decrypt_password(rec.x_sovos_invoice_pass_enc)
+
+    def _inverse_invoice_pass(self):
+        """
+        Kullanıcı x_sovos_invoice_pass'e yazdığında şifreleyip _enc sütununa kaydeder.
+        """
+        for rec in self:
+            rec.x_sovos_invoice_pass_enc = _encrypt_password(rec.x_sovos_invoice_pass)
+
+    @api.depends('x_sovos_archive_pass_enc')
+    def _compute_archive_pass(self):
+        """e-Arşiv şifresi için compute — _compute_invoice_pass ile aynı mantık."""
+        for rec in self:
+            rec.x_sovos_archive_pass = _decrypt_password(rec.x_sovos_archive_pass_enc)
+
+    def _inverse_archive_pass(self):
+        """e-Arşiv şifresi için inverse — _inverse_invoice_pass ile aynı mantık."""
+        for rec in self:
+            rec.x_sovos_archive_pass_enc = _encrypt_password(rec.x_sovos_archive_pass)
 
     def action_test_invoice_connection(self):
         """

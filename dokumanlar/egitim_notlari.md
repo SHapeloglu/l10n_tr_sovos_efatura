@@ -21,6 +21,10 @@ Bizim tarafımız (bu modül):
     Cron takibi                         (models/sovos_sync.py)
     İptal akışı                         (wizards/cancel_invoice_wizard.py)
     Tekrar gönderim                     (wizards/resend_invoice_wizard.py)
+    Gelen UBL parse                      (services/ubl_parser.py)
+    Partner/ürün eşleme (3 faz)          (services/incoming_matcher.py)
+    Öğrenen eşleme tablosu              (models/efatura_product_mapping.py)
+    Bekletme kuyruğu onay ekranı         (wizards/incoming_invoice_match_wizard.py)
 
 Sovos'un yaptığı (sadece bunlar):
     Dijital imza atar (sertifika Sovos'ta, biz yapamayız)
@@ -114,20 +118,24 @@ l10n_tr_sovos_efatura_fix/
 │   ├── res_partner.py       # Müşteri/tedarikçi genişletmesi
 │   ├── product_uom.py       # Birim kodu genişletmesi
 │   ├── account_move.py      # Fatura ana model + e-Fatura akışı
-│   └── sovos_sync.py        # Cron görevleri (yeni model)
+│   ├── sovos_sync.py        # Cron görevleri (yeni model)
+│   └── efatura_product_mapping.py  # YENİ: Öğrenen ürün eşleme tablosu
 │
 ├── services/                # Dış servis katmanı (SOAP istemcileri, XML üretici)
 │   ├── constants.py         # GİB durum kod setleri (tek kaynak)
 │   ├── ubl_builder.py       # UBL-TR 2.1 XML üretici
-│   ├── ubl_validator.py     # XSD + Schematron validasyon
+│   ├── ubl_validator.py     # XSD + lxml XPath GİB iş kuralları (saxonche yok)
+│   ├── ubl_parser.py        # YENİ: Gelen UBL-TR 2.1 XML → dict
+│   ├── incoming_matcher.py  # YENİ: 3 fazlı eşleme motoru (VKN+fuzzy+öğrenen)
 │   ├── sovos_invoice_service.py   # e-Fatura SOAP istemcisi
 │   ├── sovos_archive_service.py   # e-Arşiv SOAP istemcisi
-│   └── schemas/             # GİB şema dosyaları (XSD, Schematron XSLT)
+│   └── schemas/             # GİB şema dosyaları (XSD; setup_schemas.sh ile kurulur)
 │
 ├── wizards/                 # Geçici modeller (kullanıcı girdisi toplama)
 │   ├── cancel_invoice_wizard.py   # İptal akışı
 │   ├── resend_invoice_wizard.py   # Tekrar gönderim akışı
-│   └── kur_farki_wizard.py        # Kur farkı faturası oluşturma
+│   ├── kur_farki_wizard.py        # Kur farkı faturası oluşturma
+│   └── incoming_invoice_match_wizard.py  # YENİ: Bekletme kuyruğu toplu onay
 │
 ├── views/                   # XML arayüz tanımları
 ├── data/                    # Cron ve seri tanımları (XML)
@@ -143,14 +151,14 @@ aksiyon gerektirir.
 
 | Set | Kodlar (örnek) | Yapılması gereken |
 |-----|---------------|-------------------|
-| GIB_PENDING | 1000, 1100 | Bekle, cron takip eder |
+| GIB_PENDING | 1000, 1100, **1200**, **1220** | Bekle, cron takip eder. **1220: TEKRAR GÖNDERİLMEZ** (alıcı aldı, yanıt bekleniyor — tekrar gönderim → 1163 mükerrer hatası) |
 | GIB_SUCCESS | 1300 | accepted yap |
 | GIB_ACCEPTED_BY_RECEIVER | 1305 | accepted + inv_response=kabul |
 | GIB_REJECTED | 1310 | rejected + inv_response=red |
-| GIB_RETRY_SAME_UUID | 1101, 1103, 1150... | error yap, aynı UUID ile düzelt+tekrar gönder |
+| GIB_RETRY_SAME_UUID | 1101, 1103, 1150..., **1180–1183**, **1190–1195** | error yap, aynı UUID ile düzelt+tekrar gönder. **1181**: x_efatura_alias boş/yanlış — alias güncelle |
 | GIB_CANCEL_AND_NEW | 1104, 1163 | error yap, iptal + yeni fatura kes |
-| GIB_SOVOS_SUPPORT | 1161, 1171, 1172 | error yap, Sovos teknik destek |
-| GIB_NOTIFY_ADMIN | 1215 | sent KALIR (cron devam), admin bildir |
+| GIB_SOVOS_SUPPORT | 1161, 1171, 1172, **1176**, **1177** | error yap, Sovos teknik destek (imza yetkisi sorunları) |
+| GIB_RETRY_NEW_UUID | 1215 | **error yap**, x_gib_admin_notified=True, yeni UUID ile tekrar gönderim wizard'a yönlendir. Zarf hükümsüz sayılır — cron'da 'sent' bırakmak 1215 döngüsüne girer. Aynı Fatura ID, yeni UUID ile yeniden gönderim GİB tarafından izin veriliyor. |
 
 Neden tek kaynak (constants.py)?
 Eskiden account_move.py ve resend_wizard.py'de ayrı ayrı set tanımı vardı.
@@ -172,7 +180,7 @@ action_post()
             4. Numara rezervasyonu  → PostgreSQL savepoint ile atomik
             5. UUID üret            → uuid4()
             6. UBL-TR XML üret      → UblBuilder.build()
-            7. Validasyon           → XSD → Schematron (Saxon HE)
+            7. Validasyon           → XSD → GİB iş kuralları (lxml XPath)
             8. Odoo POST            → super().action_post() (muhasebe fişi)
             9. Sovos gönder         → SendUBL veya SendInvoice
            10. Başarı               → status=sent, envelope_uuid kaydet
@@ -205,11 +213,16 @@ Fatura gönderiminde:
 ```
 
 Cache boş + Sovos erişilemez → UserError (iş bloke, Spec Bölüm 5)
+
+> **Sovos SSS:** getUserList günde 1 kez çağrılması tavsiye edilir.
 Cache dolu + Sovos erişilemez → cache kullan (iş devam)
 
 ---
 
 ## 6. UBL-TR XML Yapısı (ubl_builder.py)
+
+> **⚠️ Kritik:** `ReceiverIdentifier`'a VKN (`partner.vat`) değil, GİB'teki **posta kutusu etiketi (alias)** gönderilmelidir.
+> `x_efatura_alias` boşsa `getUserList` cache'den doldurun — VKN fallback 1181 hatasına yol açar.
 
 GİB'in zorunlu kıldığı UBL 2.1 / TR1.2 profili formatı:
 
@@ -245,13 +258,14 @@ Namespace sistemi:
 - Zorunlu elemanlar, veri tipleri, attribute'lar
 - lxml.etree.XMLSchema ile çalışır
 
-**Katman 2 — Schematron**
+**Katman 2 — GİB İş Kuralları**
 - GİB iş kurallarını kontrol eder (XSD'nin yakalayamadıkları)
-- Örnek: "TICARIFATURA'da alıcı VKN zorunludur"
-- XSLT 2.0 gerektirir → saxonche (Saxon HE) zorunlu
-- lxml yalnızca XSLT 1.0 çalıştırır, bu yüzden yeterli değil
+- Örnek: "TICARIFATURA'da alıcı VKN zorunludur", "ID 16 karakter olmalı"
+- GİB'in `UBL-TR_Common_Schematron.xml` dosyasındaki `inv:Invoice` context'li
+  kurallar `lxml` XPath sorguları olarak implement edilmiştir
+- saxonche veya XSLT 2.0 **gerekmez** — lxml Odoo'nun standart bağımlılığıdır
 
-saxonche kurulu değilse gönderim BLOKLANIR (sessizce geçirilmez).
+İş kuralı ihlalinde: numara serbest bırakılır, gönderim bloke edilir.
 
 ---
 
@@ -292,7 +306,7 @@ Her iki servis de:
 
 | Cron | Sıklık | Ne yapar |
 |------|--------|----------|
-| cron_sync_incoming_invoices | 15 dk | Gelen faturaları Sovos'tan çekip Odoo'ya kaydeder |
+| cron_sync_incoming_invoices | 15 dk | Gelen faturaları Sovos'tan çekip Odoo'ya kaydeder. **⚠️ Sovos SSS:** getUBLList max 1 günlük tarih aralığı destekler — 2+ gün duraksama olursa chunked sorgu gerekir |
 | cron_sync_efatura_status | 30 dk | Bekleyen e-Faturaların GİB durumunu sorgular |
 | cron_sync_earsiv_status | 30 dk | Bekleyen e-Arşiv durumlarını sorgular |
 | cron_sync_inv_responses | 1 saat | TICARIFATURA KABUL/RED yanıtları |
@@ -306,10 +320,11 @@ Bir şirkette hata olursa diğerleri etkilenmez (try/except + continue).
 
 ## 11. Önemli Düzeltmeler (Bug Fix Notları)
 
-**DÜZELTME #1 — 1215 cron kilitlenmesi**
-1215 alındığında x_efatura_status 'error'a GEÇİRİLMEZ; 'sent' KALIR.
-Neden? 'error'a geçirilseydi cron bu faturayı bir daha sorgulamazdı.
-'sent' kalınca cron takip etmeye devam eder.
+**DÜZELTME #1 — 1215 yeniden gönderim akışı** *(Kaynak: GİB Detaylı Durum Kodları; Sovos SSS Soru 18)*
+1215 alındığında zarftaki fatura **hükümsüz sayılır**. x_efatura_status **'error'a GEÇİRİLMELİ**; 'sent' bırakılmamalıdır.
+Neden? 'sent' bırakılırsa cron aynı zarfı sorgulamaya devam eder ve 1215 döngüsüne girer.
+'error' yapılınca cron takibi durur; admin bilgilendirilir (x_gib_admin_notified=True); kullanıcı **aynı Fatura ID** ama **yeni UUID** ile yeniden gönderim wizard'ına yönlendirilir.
+GİB 1215 sonrasında aynı Fatura ID ile yeniden gönderimi kabul etmektedir (GİB PDF, kod 1215 satırı).
 
 **DÜZELTME #2 — Kod setleri tek kaynaktan**
 GIB_RETRY_SAME_UUID ve diğer setler artık sadece constants.py'de tanımlı.
@@ -321,9 +336,13 @@ senkronizasyon kayması riski ortadan kalktı.
 Alıcıya iletilmiş fatura tek taraflı iptal edilemez (GİB kuralı).
 Şimdi UserError fırlatılıyor: karşılıklı mutabakat gerekli mesajı.
 
-**DÜZELTME #4 — saxonche yoksa sessizce geçirme**
-saxonche kurulu değilse validasyon atlanmıyordu.
-Şimdi UserError fırlatılıyor. Sessizce geçirmek GİB'te 1150/1170 verir.
+**DÜZELTME #4 — saxonche bağımlılığı kaldırıldı**
+Önceki versiyonda GİB Schematron için saxonche (Saxon HE / XSLT 2.0) zorunluydu.
+Ancak GİB Schematron'un ham XML'i lxml'in XSLT 1.0 pipeline'ı ile derlenemiyor;
+saxonche ise XSLT stylesheet bekliyor, ham Schematron .xml kabul etmiyor.
+Çözüm: GİB Schematron'daki `inv:Invoice` context'li iş kuralları (50+) doğrudan
+lxml XPath sorguları olarak `ubl_validator.py` içine taşındı.
+saxonche bağımlılığı `__manifest__.py`'den de kaldırıldı.
 
 ---
 
@@ -513,59 +532,84 @@ MD5 ne işe yarar?
 
 ---
 
-### 13.7 saxonche — XSLT 2.0 İşlemcisi (Saxon HE)
+### 13.7 GİB İş Kuralları — lxml XPath
 
-GİB'in Schematron dosyası XSLT 2.0 gerektirir. lxml sadece XSLT 1.0 çalıştırır.
-Saxon HE (ücretsiz Java tabanlı) Python wrapper'ı ile kullanılır.
+GİB'in `UBL-TR_Common_Schematron.xml` dosyasındaki fatura iş kuralları
+doğrudan `lxml` XPath sorguları olarak `ubl_validator.py` içinde implement
+edilmiştir. Ek bağımlılık gerekmez.
 
 ```python
-import saxonche
+from lxml import etree
 
-with saxonche.PySaxonProcessor(license=False) as proc:  # HE = ücretsiz
-    xslt = proc.new_xslt30_processor()
-    svrl_str = xslt.transform_to_string(
-        source_file='fatura.xml',       # Doğrulanacak XML
-        stylesheet_file='schematron.xsl' # GİB Schematron XSLT
+NS = {
+    'cbc': 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
+    'cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
+}
+
+def _check_gib_rules(doc):
+    errors = []
+
+    # ID formatı: ABC2026000000001 (16 karakter)
+    inv_id = doc.xpath('//cbc:ID/text()', namespaces=NS)
+    if inv_id and len(inv_id[0]) != 16:
+        errors.append('cbc:ID 16 karakter olmalıdır')
+
+    # TICARIFATURA'da alıcı VKN zorunlu
+    profile = doc.xpath('//cbc:ProfileID/text()', namespaces=NS)
+    customer_ids = doc.xpath(
+        '//cac:AccountingCustomerParty/cac:Party'
+        '/cac:PartyIdentification/cbc:ID',
+        namespaces=NS
     )
+    if profile and profile[0] == 'TICARIFATURA' and not customer_ids:
+        errors.append('TICARIFATURA: alıcı VKN/TCKN zorunludur')
+
+    return errors
 ```
 
-Kurulum: `pip install saxonche`
-
-Neden Java tabanlı?
-    Saxon orijinal olarak Java ile yazılmış endüstri standardı XSLT işlemcisi.
-    saxonche Python wrapper'ı JVM'i arka planda çalıştırır.
-    Bu yüzden Java kurulu olması gerekebilir.
+Uygulanan kurallar (GİB Schematron kaynaklı):
+- ID formatı: `ABC2026000000001` (16 karakter, regex)
+- UUID: 36 karakter, v4 formatı
+- UBLVersionID: `2.1`
+- CustomizationID: `TR1.2` veya `TR1.2.1`
+- ProfileID: geçerli GİB değer listesi
+- IssueDate: geçmiş tarih, 2005-01-01 sonrası
+- InvoiceTypeCode: geçerli değer listesi
+- IADE + ProfileID kombinasyon kontrolü
+- DocumentCurrencyCode: ISO 4217
+- VKN/TCKN: 10 veya 11 hane sayısal
+- TICARIFATURA'da alıcı VKN zorunlu
+- CopyIndicator: `false`
+- En az bir InvoiceLine
+- LineExtensionAmount = Qty × Price (toleranslı)
 
 ---
 
-### 13.8 SVRL — Schematron Doğrulama Raporu
+### 13.8 GİB Schematron Dosyaları — Referans
 
-Schematron çalıştırıldığında SVRL (Schematron Validation Reporting Language)
-formatında XML çıktısı üretir. Hatalar `failed-assert` elemanlarında:
+GİB'in Schematron dosyaları `services/schemas/` altında referans amaçlı
+bulunur; `ubl_validator.py` tarafından runtime'da okunmaz.
 
-```xml
-<svrl:failed-assert test="cbc:UUID">
-    <svrl:text>UUID zorunludur</svrl:text>
-</svrl:failed-assert>
+```
+schemas/
+├── UBL-TR_Main_Schematron.xml    ← Ana kurallar (inv:Invoice context)
+├── UBL-TR_Common_Schematron.xml  ← Soyut (abstract) kural tanımları
+└── UBL-TR_Codelist.xml           ← ProfileID, InvoiceTypeCode kod listeleri
 ```
 
-lxml ile parse edilir:
-```python
-failures = svrl_doc.xpath(
-    '//svrl:failed-assert',
-    namespaces={'svrl': 'http://purl.oclc.org/dsdl/svrl'}
-)
-for f in failures:
-    test = f.get('test')    # hangi kural
-    text = f.find(...)      # hata açıklaması
-```
+Bu dosyalar GİB kurallarını anlamak ve `_check_gib_rules()` metodunu
+güncellemek için kullanılır. GİB yeni kural eklediğinde:
+1. `UBL-TR_Common_Schematron.xml`'i incele
+2. `inv:Invoice` context'li yeni assert'leri bul
+3. `ubl_validator.py`'deki `_check_gib_rules()` metoduna XPath olarak ekle
 
 ---
 
 ### 13.9 tempfile — Geçici Dosya
 
-Saxon dosya yoluyla çalışır, BytesIO kabul etmez.
-XML'i geçici dosyaya yazıp Saxon'a vermek için:
+Bazı servislerin geçici dosyaya ihtiyaç duyduğu durumlar için Python'ın
+standart `tempfile` modülü kullanılır. Örnek: Sovos gönderiminde XML'i
+ZIP öncesinde geçici olarak yazmak.
 
 ```python
 import tempfile
@@ -576,13 +620,13 @@ with tempfile.NamedTemporaryFile(suffix='.xml', delete=False) as tmp:
     tmp_path = tmp.name     # /tmp/tmpXXXXXX.xml
 
 try:
-    # Saxon burada tmp_path'i okur
-    result = xslt.transform_to_string(source_file=tmp_path, ...)
+    # tmp_path burada kullanılır
+    process(tmp_path)
 finally:
     os.unlink(tmp_path)     # Her durumda geçici dosyayı sil
 ```
 
-`delete=False`: with bloğu bitince dosya silinmesin (Saxon okuyacak).
+`delete=False`: with bloğu bitince dosya silinmesin (başka kod okuyacak).
 `os.unlink`: İşim bitti, şimdi sil.
 `finally`: Hata olsa bile geçici dosya temizlenir.
 
@@ -632,6 +676,20 @@ Kullanıcı tetikledi + hata    → UserError (ekranda popup)
 Cron/arka plan + hata         → _logger.warning veya _logger.error
 İkisi birlikte de olabilir    → logla + UserError fırlat
 ```
+
+---
+
+## 13.12 Önemli GİB / Sovos Kısıtları (kaynak belgelerden)
+
+| Kısıt | Açıklama |
+|-------|---------|
+| Fatura tarihi max 7 gün | GİB geçmişe dönük maksimum 7 gün kabul eder (VUK md.231) |
+| getUBLList tarih limiti | Tek sorguda max 1 günlük aralık — daha uzun → chunked sorgu |
+| getUserList sıklığı | Günde 1 kez tavsiye edilir (Sovos SSS) |
+| ReceiverIdentifier | PK etiketi (alias) — VKN değil. Boş alias → 1181 |
+| 1220 tekrar gönderim yasak | Alıcı aldı, yanıt bekleniyor — tekrar gönderim → 1163 mükerrer |
+| 1215 sonrası yeniden gönderim | Zarf hükümsüz, status=error, x_gib_admin_notified=True. **Aynı Fatura ID + yeni UUID** ile yeniden gönderim zorunlu (GİB Durum Kodları PDF, Sovos SSS Soru 18) |
+| Desteklenmeyen senaryolar | IHRACAT, YOLCUBERABER bu modülde yok (UBL-TR Catalogue'da tanımlı) |
 
 ---
 
