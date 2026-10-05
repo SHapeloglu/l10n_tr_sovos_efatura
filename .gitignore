@@ -1,0 +1,9 @@
+# Python önbellekleri
+__pycache__/
+*.py[cod]
+
+# Editör / işletim sistemi
+.vscode/
+.idea/
+*.swp
+.DS_Store

@@ -229,12 +229,12 @@ class TestUblValidator(SovosTestCommon):
         mock_xsd.validate.return_value = True
 
         validator = UblValidator()
+        # Dosya yoksa _run_schematron_saxon [] döner (hata yok)
         with patch.object(validator, '_load_xsd', return_value=mock_xsd), \
              patch(
                  'l10n_tr_sovos_efatura.services.ubl_validator._saxonche_available',
                  return_value=True,
              ), \
-             # Dosya yoksa _run_schematron_saxon [] döner (hata yok)
              patch.object(validator, '_run_schematron_saxon', return_value=[]):
             valid, layer, errors = validator.validate(VALID_XML)
 
@@ -256,12 +256,12 @@ class TestUblValidator(SovosTestCommon):
         mock_xsd.validate.return_value = True
 
         validator = UblValidator()
+        # side_effect=RuntimeError → çağrıldığında exception fırlatır
         with patch.object(validator, '_load_xsd', return_value=mock_xsd), \
              patch(
                  'l10n_tr_sovos_efatura.services.ubl_validator._saxonche_available',
                  return_value=True,
              ), \
-             # side_effect=RuntimeError → çağrıldığında exception fırlatır
              patch.object(validator, '_run_schematron_saxon',
                           side_effect=RuntimeError('Saxon crash')):
             valid, layer, errors = validator.validate(VALID_XML)
