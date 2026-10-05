@@ -28,6 +28,7 @@ import base64
 import hashlib
 import io
 import logging
+from xml.sax.saxutils import escape
 import zipfile
 from datetime import datetime
 
@@ -63,8 +64,9 @@ class SovosInvoiceService:
         test_mode=True iken test endpoint kullanılır; GİB'e iletim yapılmaz.
         """
         self.company = company
-        self.user         = company.x_sovos_invoice_user
-        self.password     = company.x_sovos_invoice_pass
+        # SOAP gövdesine %s ile yazıldığı için XML'e kaçışlanır (& < > şifreyi bozmasın)
+        self.user         = escape(company.x_sovos_invoice_user or '')
+        self.password     = escape(company.x_sovos_invoice_pass or '')
         self.sender_vkn   = company.x_sovos_sender_vkn
         self.identifier   = company.x_sovos_identifier   # Posta kutusu (GB kodu)
         self.test_mode    = company.x_sovos_test_mode

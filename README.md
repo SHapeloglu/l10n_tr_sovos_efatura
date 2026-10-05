@@ -320,7 +320,7 @@ kurallar XPath ile implement edilmiştir:
 | GİB iş kuralı ihlali | 1150, 1170 | Numara serbest, inline kırmızı bant, kural adı gösterilir |
 | Validasyon geçti | — | Sovos'a iletim başlar |
 
-> **Şema Güncellemeleri:** GİB XSD dosyaları `services/schemas/` dizininde saklanır.
+> **Şema Güncellemeleri:** GİB XSD dosyaları `services/schemas/` dizininde saklanır (git'te izlenmez; yalnız `VERSION` izlenir — her kurulumda `setup_schemas.sh` çalıştırılmalı).
 > GİB şema güncellemelerinde (yılda 1-2 kez) `setup_schemas.sh` yeniden çalıştırılır;
 > Schematron kuralları `ubl_validator.py` içindedir, XSD ile birlikte güncellenir.
 

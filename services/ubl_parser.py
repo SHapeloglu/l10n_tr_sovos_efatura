@@ -39,6 +39,9 @@ Döndürülen yapı:
 import logging
 from lxml import etree
 
+# Gelen fatura üçüncü tarafın XML'i: entity çözme ve ağ erişimi kapalı (XXE önlemi)
+_SAFE_PARSER = etree.XMLParser(resolve_entities=False, no_network=True)
+
 _logger = logging.getLogger(__name__)
 
 NS = {
@@ -73,7 +76,7 @@ class UblParser:
         Returns: dict (yukarıdaki yapı)
         """
         try:
-            root = etree.fromstring(xml_bytes)
+            root = etree.fromstring(xml_bytes, parser=_SAFE_PARSER)
         except etree.XMLSyntaxError as e:
             raise ValueError('UBL XML parse hatası: %s' % e)
 

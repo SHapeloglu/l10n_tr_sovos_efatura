@@ -2,15 +2,16 @@
 
 Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura ve e-Arşiv gönderimi, gelen alış faturalarını alma, durum takibi, TİCARİFATURA kabul/red, iptal/yeniden gönderim, kur farkı faturası, PDF arşivi, VKN cache, çok şirket. Gönderim öncesi UBL-TR XSD + iş kuralı doğrulaması ve **atomik fatura numarası** rezervasyonu.
 
-- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.6.0.0** (2026-06-11)
+- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.8.0.1** (2026-10-05; sunucudaki v8 + güvenlik düzeltmeleri)
 - Mimari: `architect.md` · Görevler: `task.md` · Fikirler: `backlog.md` · Günlük: `session.md`
 
-## ⚠️ Canlı kod repodan ileride
+## ⚠️ Sunucu kopyası ile repo
 
-- Sunucudaki kurulu kopya: **`/opt/odoo/custom_addons/l10n_tr_sovos_efatura` — sürüm 18.0.8.0.0** (2026-06-23, git deposu değil). `odoo18-prod` (8076, `olap_prod`) ve `odoo18-test` (8074, `odoo18-test`) servisleri bu klasörü yüklüyor.
-- v8'de olup repoda olmayanlar: `models/efatura_product_mapping.py` (`efatura.product.mapping`), `setup_schemas.sh`, `services/schemas/` altında gerçek GİB şema dosyaları, Schematron yerine **XPath tabanlı iş kuralı** doğrulaması, değişmiş `account_move.py` / `res_company.py` / `res_partner.py` / `sovos_sync.py` / güvenlik dosyası.
-- Bir de `l10n_tr_sovos_efatura.bak_20260628` yedeği var.
-- **Değişikliği hangi kopyada yapacağını kullanıcıya sor.** Tercih edilen yol: v8'i bu repoya taşıyıp sunucuyu repodan güncellemek.
+- Sunucudaki kurulu kopya: **`/opt/odoo/custom_addons/l10n_tr_sovos_efatura`** (git deposu değil). `odoo18-prod` (8076, `olap_prod`) ve `odoo18-test` (8074, `odoo18-test`) servisleri bu klasörü yüklüyor.
+- 2026-10-05: sunucudaki v18.0.8.0.0 repoya alındı; repo artık **önde** (18.0.8.0.1: SOAP kimlik bilgisi XML kaçışı, gelen faturada XXE önlemi). Sunucu henüz güncellenmedi.
+- GİB şema dosyaları (`services/schemas/` altı, `VERSION` hariç) repoda yok — sunucuda `setup_schemas.sh` ile kurulur. Sunucuyu repodan güncellerken mevcut `services/schemas/` korunmalı.
+- Bir de sunucuda `l10n_tr_sovos_efatura.bak_20260628` yedeği var.
+- **Değişiklik repoda yapılır**, sunucu repodan güncellenir; sunucuda doğrudan düzenleme yapma.
 
 ## Komutlar
 
@@ -30,7 +31,8 @@ Servis kullanıcısı / venv yolu sunucuda doğrulanmalı (`systemctl cat odoo18
 - Teknik hata (1101, 1103, 11xx…) → **aynı UUID** ile tekrar gönder; içerik hatası → iptal + yeni fatura. `resend_invoice_wizard` bu ayrımı yapıyor.
 - Atomik numara: `ir.sequence` ile rezerve → doğrulama/gönderim başarısızsa **serbest bırak** (`x_number_status=released`), başarılıysa onayla. Akışın sırasını bozma.
 - Test modunda (`x_sovos_test_mode=True`) GİB'e iletim yapılmaz; test verisinde gerçek VKN kullanma (KVKK).
-- Sovos kimlik bilgileri şirket kaydında (`res.company`); koda/data XML'ine yazma.
+- Sovos kimlik bilgileri şirket kaydında (`res.company`); koda/data XML'ine yazma. SOAP gövdesine yazılan kullanıcı girdisi `xml.sax.saxutils.escape` ile kaçışlanır.
+- Dışarıdan gelen XML (gelen fatura) `resolve_entities=False, no_network=True` parser ile okunur (`services/ubl_parser.py`).
 - Yeni alanlar `x_` önekli (mevcut konvansiyon). Görünüm ve model değişikliğinde `__manifest__.py` sürümünü artır.
-- `dokumanlar/` (BRD, Spec, test raporu, eğitim notları, geliştirici sözlüğü) ve `kaynaklar/` (GİB durum kodları PDF, Sovos UBL-TR kataloğu, örnek API istemcisi) referanstır; `kaynaklar/setup.exe` ve zip'ler ikili dosya.
+- `dokumanlar/` (BRD, Spec, test raporu, eğitim notları, geliştirici sözlüğü) ve `kaynaklar/` (GİB durum kodları PDF, Sovos UBL-TR kataloğu, örnek API istemcisi) referanstır. `setup.exe` repodan çıkarıldı.
 - Oturum sonunda `session.md`'ye kayıt düş, `task.md`'yi güncelle.
