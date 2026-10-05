@@ -1,45 +1,36 @@
-# CLAUDE.md
+# CLAUDE.md — l10n_tr_sovos_efatura (Odoo 18 × Sovos e-Fatura / e-Arşiv)
 
-Bu dosya, bu proje üzerinde çalışırken Claude'un (Claude Code dahil) izlemesi gereken bağlamı ve kuralları içerir.
+Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura ve e-Arşiv gönderimi, gelen alış faturalarını alma, durum takibi, TİCARİFATURA kabul/red, iptal/yeniden gönderim, kur farkı faturası, PDF arşivi, VKN cache, çok şirket. Gönderim öncesi UBL-TR XSD + iş kuralı doğrulaması ve **atomik fatura numarası** rezervasyonu.
 
-## Proje
+- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.6.0.0** (2026-06-11)
+- Mimari: `architect.md` · Görevler: `task.md` · Fikirler: `backlog.md` · Günlük: `session.md`
 
-**🧾 l10n_tr_sovos_efatura** — **Odoo 18 Community × Sovos e-Fatura / e-Arşiv Entegrasyon Modülü** **Teknik Entegrasyon Spesifikasyonu v6.0 — Haziran 2026 — Final** Satış + Alış + Muhasebe + PDF Arşivi + Kur Farkı + XSD/Schematron Validasyon + Atomik Fatura Numarası
+## ⚠️ Canlı kod repodan ileride
 
-- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura
+- Sunucudaki kurulu kopya: **`/opt/odoo/custom_addons/l10n_tr_sovos_efatura` — sürüm 18.0.8.0.0** (2026-06-23, git deposu değil). `odoo18-prod` (8076, `olap_prod`) ve `odoo18-test` (8074, `odoo18-test`) servisleri bu klasörü yüklüyor.
+- v8'de olup repoda olmayanlar: `models/efatura_product_mapping.py` (`efatura.product.mapping`), `setup_schemas.sh`, `services/schemas/` altında gerçek GİB şema dosyaları, Schematron yerine **XPath tabanlı iş kuralı** doğrulaması, değişmiş `account_move.py` / `res_company.py` / `res_partner.py` / `sovos_sync.py` / güvenlik dosyası.
+- Bir de `l10n_tr_sovos_efatura.bak_20260628` yedeği var.
+- **Değişikliği hangi kopyada yapacağını kullanıcıya sor.** Tercih edilen yol: v8'i bu repoya taşıyıp sunucuyu repodan güncellemek.
 
-## Teknoloji Yığını
-
-- Odoo 18 modülü (Python + XML view)
-
-## Önemli Dosyalar
-
-- `__manifest__.py`
-- `static/description/index.html`
-
-Mimari ayrıntılar için bkz. `architect.md`.
-
-## Sık Kullanılan Komutlar
+## Komutlar
 
 ```bash
-pytest
-odoo -c <odoo.conf> -u <modul_adi> -d <veritabani>   # modülü güncelle
+# Kurulum / güncelleme (sunucuda test ortamı)
+sudo -u odoo /opt/odoo/venv18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo/odoo18-test.conf -d odoo18-test -u l10n_tr_sovos_efatura --stop-after-init
+# Testler (Odoo test çatısı; tests/ altında 11 dosya)
+sudo -u odoo /opt/odoo/venv18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo/odoo18-test.conf -d odoo18-test --test-tags /l10n_tr_sovos_efatura -u l10n_tr_sovos_efatura --stop-after-init
+# GİB şemaları (v8): bash setup_schemas.sh UBL-TR1.2.1_Paketi.zip e-FaturaPaketi.zip
 ```
 
-## Kurallar
+Servis kullanıcısı / venv yolu sunucuda doğrulanmalı (`systemctl cat odoo18-test`). **Prod veritabanında `-u` çalıştırmadan önce test DB'de dene ve kullanıcıya sor.**
 
-- Model değişikliğinden sonra modül mutlaka `-u <modul>` ile güncellenmeli; yeni alanlar için view XML ve erişim kuralları (`security/ir.model.access.csv`) birlikte güncellenmeli.
-- `__manifest__.py` içindeki `data` listesine eklenmeyen XML dosyaları yüklenmez.
-- Odoo çekirdeğini değiştirme; davranışı `_inherit` ile genişlet.
-- `.env`, parola, token ve API anahtarlarını asla commit etme.
-- Her çalışma oturumunun sonunda `session.md`ye kısa kayıt düş; görev durumunu `task.md`de güncelle.
-- Önceliklendirilmemiş fikirleri `backlog.md`ye yaz; somutlaşınca `task.md`ye taşı.
+## Kurallar ve Tuzaklar
 
-## Çalışma Dosyaları
-
-| Dosya | Amaç |
-|---|---|
-| `architect.md` | Mimari ve dizin yapısı referansı |
-| `task.md` | Aktif / devam eden / tamamlanan görevler |
-| `backlog.md` | Önceliklendirilmemiş fikir ve teknik borç havuzu |
-| `session.md` | Oturum günlüğü — her oturum sonunda güncellenir |
+- **GİB durum kodları tek kaynak: `services/constants.py`** (`GIB_RETRY_SAME_UUID`, `GIB_CANCEL_AND_NEW`, …). Kod setini başka dosyada tekrar tanımlama.
+- Teknik hata (1101, 1103, 11xx…) → **aynı UUID** ile tekrar gönder; içerik hatası → iptal + yeni fatura. `resend_invoice_wizard` bu ayrımı yapıyor.
+- Atomik numara: `ir.sequence` ile rezerve → doğrulama/gönderim başarısızsa **serbest bırak** (`x_number_status=released`), başarılıysa onayla. Akışın sırasını bozma.
+- Test modunda (`x_sovos_test_mode=True`) GİB'e iletim yapılmaz; test verisinde gerçek VKN kullanma (KVKK).
+- Sovos kimlik bilgileri şirket kaydında (`res.company`); koda/data XML'ine yazma.
+- Yeni alanlar `x_` önekli (mevcut konvansiyon). Görünüm ve model değişikliğinde `__manifest__.py` sürümünü artır.
+- `dokumanlar/` (BRD, Spec, test raporu, eğitim notları, geliştirici sözlüğü) ve `kaynaklar/` (GİB durum kodları PDF, Sovos UBL-TR kataloğu, örnek API istemcisi) referanstır; `kaynaklar/setup.exe` ve zip'ler ikili dosya.
+- Oturum sonunda `session.md`'ye kayıt düş, `task.md`'yi güncelle.

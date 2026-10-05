@@ -1,47 +1,33 @@
-# session.md — 🧾 l10n_tr_sovos_efatura Oturum Günlüğü
-
-Her çalışma oturumunda buraya kısa bir kayıt düşülür: ne yapıldı, hangi kararlar alındı, sıradaki adım ne. Amaç, bir sonraki oturuma (veya başka bir geliştiriciye/Claude örneğine) hızlıca bağlam aktarmak.
-
----
-
-## Şablon
-
-```markdown
-## YYYY-AA-GG
-
-**Yapılanlar:**
-- ...
-
-**Alınan kararlar / neden:**
-- ...
-
-**Açık sorunlar / bilinen eksikler:**
-- ...
-
-**Sıradaki adım:**
-- ...
-```
+# session.md — l10n_tr_sovos_efatura Oturum Günlüğü
 
 ---
 
 ## 2026-10-05
 
 **Yapılanlar:**
-- Eksik proje çalışma dosyaları oluşturuldu: `architect.md`, `backlog.md`, `CLAUDE.md`, `session.md`, `task.md`.
-- İçerik; README, dosya yapısı, bağımlılık dosyaları ve git geçmişinden çıkarıldı.
+- Şablondan üretilmiş çalışma dosyaları kod okunarak yeniden yazıldı.
 
-**Açık sorunlar / bilinen eksikler:**
-- Repo kökünde `.gitignore` yok — `venv/`, `__pycache__/`, `.env`, build çıktıları için eklenmeli.
+**Tespitler:**
+- Repo 18.0.6.0.0; sunucuda prod/test Odoo'nun yüklediği kopya 18.0.8.0.0 ve git dışında.
+- Repoda GİB şema dosyaları yok (yalnız `VERSION`), `.pyc` izleniyor.
 
-**Sıradaki adım:**
-- `CLAUDE.md` ve `architect.md` içeriğini gözden geçirip proje sahibinin bilgisiyle tamamla.
+**Sıradaki adım:** `task.md` → v8'i repoya alma kararı.
 
-### Bu tarihten önceki son commit'ler (referans)
+---
 
-- 2026-06-11 — ilk commit
-- 2026-06-09 — ilk commit
-- 2026-06-09 — ilk commit
-- 2026-06-09 — ilk commit
-- 2026-06-09 — ilk commit
-- 2026-06-07 — Add files via upload
-- 2026-06-07 — first commit
+## Önceki Çalışmalar
+
+- **2026-06-23** — Sunucuda v8 (repoya işlenmedi).
+- **2026-06-07 → 06-11** — İlk commit ve v6 Final yüklemeleri.
+
+---
+
+### Kayıt Şablonu
+
+```markdown
+## YYYY-AA-GG
+**Yapılanlar:** ...
+**Kararlar / neden:** ...
+**Açık sorunlar:** ...
+**Sıradaki adım:** ...
+```

@@ -1,13 +1,12 @@
-# task.md — 🧾 l10n_tr_sovos_efatura Görev Takibi
-
-Bu dosya projedeki güncel görevleri takip etmek için kullanılır. Yeni bir göreve başlarken "Devam Eden"e taşı, bitirince "Tamamlanan"a taşı ve tarih ekle.
+# task.md — l10n_tr_sovos_efatura Görevleri
 
 ## 🔜 Sıradaki
 
-- [ ] `CLAUDE.md` / `architect.md` içeriğini doğrula ve eksikleri tamamla
-- [ ] Repo kökünde `.gitignore` yok — `venv/`, `__pycache__/`, `.env`, build çıktıları için eklenmeli.
-
-> Uzun vadeli / önceliklendirilmemiş fikirler için bkz. `backlog.md`.
+- [ ] **Canlı v8'i repoya al** (`/opt/odoo/custom_addons/l10n_tr_sovos_efatura` → bu repo), README ve manifest açıklamasını v8'e güncelle; sunucu kopyasını git ile yönetilir hale getir — kullanıcı onayıyla
+- [ ] `__pycache__/*.pyc` takipten çıkar, `.gitignore` ekle
+- [ ] `services/schemas/` için karar: GİB şema dosyaları repoya mı (lisans/boyut), yoksa `setup_schemas.sh` ile kurulum mu
+- [ ] Test DB'de `--test-tags /l10n_tr_sovos_efatura` çalıştırıp sonucu kaydet
+- [ ] `l10n_tr_sovos_efatura.bak_20260628` yedeğinin gerekliliğini kullanıcıyla değerlendir
 
 ## 🚧 Devam Eden
 
@@ -15,15 +14,6 @@ _(şu anda boş)_
 
 ## ✅ Tamamlanan
 
-- [x] 2026-10-05 — Proje çalışma dosyaları oluşturuldu
-
----
-
-### Görev Ekleme Şablonu
-
-```markdown
-- [ ] Kısa görev başlığı
-  - Bağlam: neden yapılıyor
-  - Kabul kriteri: ne zaman "bitti" sayılır
-  - İlgili dosyalar: ...
-```
+- [x] 2026-10-05 — Çalışma dosyaları kod okunarak yeniden yazıldı; repo (v6) ile canlı kopya (v8) farkı tespit edildi
+- [x] 2026-06-23 — (yalnız sunucuda) v8: ürün eşleme modeli, XPath iş kuralları, şema kurulum betiği
+- [x] 2026-06-07 → 06-11 — v6 Final: XSD/Schematron, atomik numara, tam GİB durum kodları, cron bildirimi, testler
