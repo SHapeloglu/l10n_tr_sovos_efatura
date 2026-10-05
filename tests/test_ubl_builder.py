@@ -55,7 +55,7 @@ class TestUblBuilder(SovosTestCommon):
         Gerçek UblBuilder.build() çağrısı yapar, parse edilmiş root döner.
         Sovos/GİB'e bağlantı kurmaz.
         """
-        from l10n_tr_sovos_efatura.services.ubl_builder import UblBuilder
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_builder import UblBuilder
 
         if partner is None:
             partner = self.partner_efatura
@@ -192,7 +192,7 @@ class TestUblBuilder(SovosTestCommon):
         display_type='line_section' kalemleri InvoiceLine olarak XML'e eklenmemeli.
         Sadece display_type='product' kalemleri işlenmeli.
         """
-        from l10n_tr_sovos_efatura.services.ubl_builder import UblBuilder
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_builder import UblBuilder
 
         inv = self._create_invoice()
         inv.write({'state': 'posted', 'name': 'TST2026000000001'})
@@ -242,7 +242,7 @@ class TestUblBuilder(SovosTestCommon):
         if not tax:
             self.skipTest('Satış vergisi tanımlı değil — vergi testi atlandı')
 
-        from l10n_tr_sovos_efatura.services.ubl_builder import UblBuilder
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_builder import UblBuilder
 
         inv = self._create_invoice(lines=[(1, 1000.0, self.account_income)])
         inv.invoice_line_ids[0].write({'tax_ids': [(4, tax.id)]})
@@ -262,7 +262,7 @@ class TestUblBuilder(SovosTestCommon):
         GİB 1133 hatası: Zarf ID ile XML adı uyuşmuyor.
         GİB 1142 hatası: Zarf ID ile ZIP adı uyuşmuyor.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         svc = SovosInvoiceService(self.company)
         test_uuid = 'cccccccc-dddd-eeee-ffff-000000000001'
@@ -283,7 +283,7 @@ class TestUblBuilder(SovosTestCommon):
         AC-12: ArchiveService._create_zip() da aynı UUID.xml kuralına uymalı.
         GİB 1142 hatası: ZIP adı UUID ile uyuşmuyor.
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         svc = SovosArchiveService(self.company)
         test_uuid = 'cccccccc-dddd-eeee-ffff-000000000002'
@@ -303,7 +303,7 @@ class TestUblBuilder(SovosTestCommon):
         send_ubl() çağrısında Sovos'a iletilen fileName UUID.zip olmalı.
         Spec §14.2: fileName=f'{uuid}.zip' — rand_no DEĞİL.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         test_uuid = 'cccccccc-dddd-eeee-ffff-000000000003'
         captured_body = []
@@ -329,7 +329,7 @@ class TestUblBuilder(SovosTestCommon):
         ArchiveService.send_invoice() de fileName UUID.zip kullanmalı.
         Spec §14.3: fileName=f'{uuid}.zip'.
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         test_uuid = 'cccccccc-dddd-eeee-ffff-000000000004'
         captured_body = []

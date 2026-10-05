@@ -77,7 +77,7 @@ class TestUblValidator(SovosTestCommon):
 
         Mock kullanılmaz — lxml parse'ı harici bağımlılık gerektirmez.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
 
         valid, layer, errors = UblValidator().validate(BROKEN_XML)
 
@@ -93,7 +93,7 @@ class TestUblValidator(SovosTestCommon):
         """
         XSD doğrulaması başarısız → (False, 'XSD', [...]) dönmeli.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
 
         mock_xsd = MagicMock()
         mock_xsd.validate.return_value = False
@@ -112,7 +112,7 @@ class TestUblValidator(SovosTestCommon):
         XSD dosyası yoksa (_load_xsd None döner) katman ATLANMALI,
         gönderim bloke edilmemeli.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
 
         validator = UblValidator()
         with patch.object(validator, '_load_xsd', return_value=None), \
@@ -131,7 +131,7 @@ class TestUblValidator(SovosTestCommon):
 
         Örnek: Hatalı fatura ID formatı, geçersiz ProfileID vb.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
 
         mock_xsd = MagicMock()
         mock_xsd.validate.return_value = True  # XSD geçti
@@ -162,7 +162,7 @@ class TestUblValidator(SovosTestCommon):
             GİB'e hatalı fatura göndermek yerine kullanıcıyı bilgilendirip
             durmak daha güvenlidir.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
         from odoo.exceptions import UserError
 
         mock_xsd = MagicMock()
@@ -179,7 +179,7 @@ class TestUblValidator(SovosTestCommon):
         """
         _check_gib_rules boş liste döndürürse (ihlal yok) geçerli sayılmalı.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
 
         mock_xsd = MagicMock()
         mock_xsd.validate.return_value = True
@@ -201,7 +201,7 @@ class TestUblValidator(SovosTestCommon):
         """
         XSD geçti + iş kuralları geçti → (True, None, []) dönmeli.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
 
         mock_xsd = MagicMock()
         mock_xsd.validate.return_value = True
@@ -226,7 +226,7 @@ class TestUblValidator(SovosTestCommon):
         XSD parse etmek pahalıdır (CPU + bellek).
         İlk yüklemeden sonra self._xsd'de cache'de tutulur.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
 
         validator = UblValidator()
         mock_xsd = MagicMock()
@@ -257,7 +257,7 @@ class TestUblValidator(SovosTestCommon):
         _check_gib_rules() ID format kuralını doğru yakalamalı.
         ABC2026000000001 (16 karakter) formatı zorunludur.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
         from lxml import etree
 
         xml = b'''<?xml version="1.0" encoding="UTF-8"?>
@@ -307,7 +307,7 @@ class TestUblValidator(SovosTestCommon):
         """
         Gelecek tarihli fatura → IssueDate hatası dönmeli.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
         from lxml import etree
 
         xml = b'''<?xml version="1.0" encoding="UTF-8"?>
@@ -357,7 +357,7 @@ class TestUblValidator(SovosTestCommon):
         """
         TICARIFATURA senaryosunda alıcı VKN/TCKN zorunludur.
         """
-        from l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
+        from odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator import UblValidator
         from lxml import etree
 
         # Alıcı PartyIdentification olmadan TICARIFATURA

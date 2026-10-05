@@ -136,7 +136,7 @@ class TestAtomicNumber(SovosTestCommon):
 
         # _mock_ubl_builder() kullanmıyoruz — doğrudan HATA mock'u yazıyoruz
         with patch(
-            'l10n_tr_sovos_efatura.services.ubl_builder.UblBuilder.build',
+            'odoo.addons.l10n_tr_sovos_efatura.services.ubl_builder.UblBuilder.build',
             side_effect=Exception('lxml serialize hatası'),  # exception fırlatır
         ):
             with self.assertRaises(UserError):

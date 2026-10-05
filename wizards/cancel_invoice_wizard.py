@@ -181,6 +181,10 @@ class CancelInvoiceWizard(models.TransientModel):
             Sovos API'si başarısız dönerse UserError fırlatılır.
             Odoo'da durum değişmez (iptal yarım kalmaz).
         """
+        # GİB: iptal gerekçesi zorunlu — boşsa API'ye gitmeden dur
+        if not (self.cancel_reason or '').strip():
+            raise UserError(_('e-Arşiv iptali için iptal gerekçesi zorunludur.'))
+
         from ..services.sovos_archive_service import SovosArchiveService
         svc = SovosArchiveService(company)
         try:

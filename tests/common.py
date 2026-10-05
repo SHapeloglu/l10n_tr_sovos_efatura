@@ -334,7 +334,7 @@ class SovosTestCommon(TransactionCase):
         dummy_xml = b'<?xml version="1.0" encoding="UTF-8"?><Invoice>TEST</Invoice>'
         return patch(
             # Tam Python import yolu: paket.modül.Sınıf.metod
-            'l10n_tr_sovos_efatura.services.ubl_builder.UblBuilder.build',
+            'odoo.addons.l10n_tr_sovos_efatura.services.ubl_builder.UblBuilder.build',
             return_value=dummy_xml,   # çağrıldığında bu değeri döndür
         )
 
@@ -351,7 +351,7 @@ class SovosTestCommon(TransactionCase):
         simüle etmek istediğimizde.
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
+            'odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
             return_value=(True, None, []),
         )
 
@@ -371,7 +371,7 @@ class SovosTestCommon(TransactionCase):
         Örn: Zorunlu alan eksik (cbc:ID, cbc:IssueDate vb.)
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
+            'odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
             # errors or [...] → errors None/boş ise varsayılan hata mesajını kullan
             return_value=(False, 'XSD', errors or ['cbc:ID zorunlu alan eksik']),
         )
@@ -389,7 +389,7 @@ class SovosTestCommon(TransactionCase):
             BR-XX kodları GİB'in iş kuralı (Business Rule) kodlarıdır.
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
+            'odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
             return_value=(False, 'SCHEMATRON', errors or ['BR-01: Fatura numarası zorunlu']),
         )
 
@@ -403,7 +403,7 @@ class SovosTestCommon(TransactionCase):
         Dönüş değeri: (False, 'XML_PARSE', ['XML sözdizim hatası satır 1'])
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
+            'odoo.addons.l10n_tr_sovos_efatura.services.ubl_validator.UblValidator.validate',
             return_value=(False, 'XML_PARSE', ['XML sözdizim hatası satır 1']),
         )
 
@@ -419,7 +419,7 @@ class SovosTestCommon(TransactionCase):
             inv.x_efatura_status == 'sent' olur
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.send_ubl',
             return_value='mock-envelope-uuid',   # gerçekte Sovos'tan gelen UUID
         )
@@ -432,7 +432,7 @@ class SovosTestCommon(TransactionCase):
         InvoiceService DEĞİL, ArchiveService kullanılır.
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.sovos_archive_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service'
             '.SovosArchiveService.send_invoice',
             return_value='mock-archive-uuid',
         )
@@ -448,7 +448,7 @@ class SovosTestCommon(TransactionCase):
         Beklenen davranış: numara serbest bırakılmalı, fatura draft'a dönmeli.
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.send_ubl',
             side_effect=Exception(msg),    # çağrıldığında Exception fırlatır
         )
@@ -465,7 +465,7 @@ class SovosTestCommon(TransactionCase):
             is_registered=False → bu VKN GİB'e kayıtsız (earsiv)
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.check_vkn_registered',
             return_value=is_registered,
         )
@@ -479,7 +479,7 @@ class SovosTestCommon(TransactionCase):
         Beklenen davranış: Mevcut cache korunmalı, işlem bloke edilmemeli.
         """
         return patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.check_vkn_registered',
             side_effect=Exception('Sovos bağlantı hatası'),
         )

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'TR Sovos e-Fatura / e-Arşiv Entegrasyonu',
-    'version': '18.0.8.0.2',
+    'version': '18.0.8.0.3',
     'category': 'Accounting/Localizations',
     'summary': 'Odoo 18 Community × Sovos GİB e-Fatura & e-Arşiv entegrasyonu (v8)',
     'description': """

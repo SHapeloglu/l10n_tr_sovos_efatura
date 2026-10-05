@@ -27,7 +27,7 @@ gerçekleştiren geçici formlardır. Kullanıcı butona tıklar → wizard aç�
 
 YENİDEN GÖNDERİM AKIŞLARI:
     same_uuid  → Aynı UUID ile tekrar gönder (1101, 1103, 1150, 1160, 1210)
-    new_uuid   → Yeni UUID üret (1104, 1163)
+    new_invoice → İptal + yeni fatura (1104, 1163)
 
 v6.1 Değişiklikler:
   - cancel_wizard: TICARIFATURA 8 gün kontrolü deadline field'a taşındı
@@ -71,7 +71,7 @@ class TestCancelWizard(SovosTestCommon):
         })
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_archive_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service'
             '.SovosArchiveService.cancel_invoice',
             return_value=True,   # API başarılı yanıt verdi
         ) as mock_cancel:
@@ -120,7 +120,7 @@ class TestCancelWizard(SovosTestCommon):
         })
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_archive_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service'
             '.SovosArchiveService.cancel_invoice',
             side_effect=Exception('Sovos bağlantı hatası'),
         ), self.assertRaises(UserError):
@@ -139,13 +139,13 @@ class TestCancelWizard(SovosTestCommon):
 
         TEMELFATURA iptalinde alıcı onayı GEREKMEZ (tek taraflı),
         ama kullanıcının bilinçli olarak "evet, iptal ediyorum" demesi istenir.
-        Checkbox: x_confirm_cancel = True
+        Checkbox: gib_portal_confirmed = True
         """
         inv = self._create_sent_invoice(scenario='TEMELFATURA')
         wizard = self.env['sovos.cancel.invoice.wizard'].create({
             'invoice_id': inv.id,
             'cancel_reason': 'Hatalı fatura',
-            'x_confirm_cancel': False,   # onay YOK
+            'gib_portal_confirmed': False,   # onay YOK
         })
 
         with self.assertRaises(UserError) as cm:
@@ -162,11 +162,11 @@ class TestCancelWizard(SovosTestCommon):
         wizard = self.env['sovos.cancel.invoice.wizard'].create({
             'invoice_id': inv.id,
             'cancel_reason': 'Hatalı fatura',
-            'x_confirm_cancel': True,    # onay VAR
+            'gib_portal_confirmed': True,    # onay VAR
         })
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.cancel_invoice',
             return_value=True,
         ):
@@ -189,20 +189,24 @@ class TestCancelWizard(SovosTestCommon):
         timedelta(-1): deadline dün = 8 gün DOLDU.
         """
         inv = self._create_sent_invoice(scenario='TICARIFATURA')
-        # Deadline geçmiş: dün
-        inv.write({'x_inv_response_deadline': date.today() - timedelta(days=1)})
+        # Deadline geçmiş: dün. 'sent' durumu ayrıca bloklandığı için (DÜZELTME #3)
+        # süre kontrolünü izole etmek adına alıcıya ulaşmamış ('error') fatura kullanılır.
+        inv.write({
+            'x_efatura_status': 'error',
+            'x_inv_response_deadline': date.today() - timedelta(days=1),
+        })
 
         wizard = self.env['sovos.cancel.invoice.wizard'].create({
             'invoice_id': inv.id,
             'cancel_reason': 'İptal denemesi',
-            'x_confirm_cancel': True,
+            'gib_portal_confirmed': True,
         })
 
         with self.assertRaises(UserError) as cm:
             wizard.action_cancel()
 
-        # Hata mesajında portal yönlendirmesi olmalı
-        self.assertIn('portal', str(cm.exception).lower())
+        # Hata mesajında 8 günlük sürenin dolduğu belirtilmeli
+        self.assertIn('8 günlük', str(cm.exception).lower())
         # Fatura hâlâ iptal olmamış
         self.assertNotEqual(inv.x_efatura_status, 'cancelled')
 
@@ -213,17 +217,21 @@ class TestCancelWizard(SovosTestCommon):
         Deadline yarın = hâlâ 1 gün var → iptal yapılabilir.
         """
         inv = self._create_sent_invoice(scenario='TICARIFATURA')
-        # Deadline yarın = süre dolmamış
-        inv.write({'x_inv_response_deadline': date.today() + timedelta(days=1)})
+        # Alıcıya ulaşmamış ('error') TICARIFATURA süre içindeyse iptal edilebilir;
+        # 'sent' (alıcıya iletildi) ayrıca bloklanır — bkz. test_ticarifatura_cancel_blocked_when_sent
+        inv.write({
+            'x_efatura_status': 'error',
+            'x_inv_response_deadline': date.today() + timedelta(days=1),
+        })
 
         wizard = self.env['sovos.cancel.invoice.wizard'].create({
             'invoice_id': inv.id,
             'cancel_reason': 'Test iptali',
-            'x_confirm_cancel': True,
+            'gib_portal_confirmed': True,
         })
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.cancel_invoice',
             return_value=True,
         ):
@@ -241,16 +249,21 @@ class TestCancelWizard(SovosTestCommon):
             deadline > today → izin ver (süre var)
         """
         inv = self._create_sent_invoice(scenario='TICARIFATURA')
-        inv.write({'x_inv_response_deadline': date.today()})   # tam bugün
+        # Alıcıya ulaşmamış ('error') TICARIFATURA süre içindeyse iptal edilebilir;
+        # 'sent' (alıcıya iletildi) ayrıca bloklanır — bkz. test_ticarifatura_cancel_blocked_when_sent
+        inv.write({
+            'x_efatura_status': 'error',
+            'x_inv_response_deadline': date.today(),
+        })
 
         wizard = self.env['sovos.cancel.invoice.wizard'].create({
             'invoice_id': inv.id,
             'cancel_reason': 'Son gün iptali',
-            'x_confirm_cancel': True,
+            'gib_portal_confirmed': True,
         })
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.cancel_invoice',
             return_value=True,
         ):
@@ -258,6 +271,26 @@ class TestCancelWizard(SovosTestCommon):
             wizard.action_cancel()
 
         self.assertEqual(inv.x_efatura_status, 'cancelled')
+
+    def test_ticarifatura_cancel_blocked_when_sent(self):
+        """
+        Alıcıya iletilmiş ('sent') TICARIFATURA tek taraflı iptal edilemez,
+        süre dolmamış olsa bile (karşılıklı mutabakat gerekir).
+        """
+        inv = self._create_sent_invoice(scenario='TICARIFATURA')
+        inv.write({'x_inv_response_deadline': date.today() + timedelta(days=3)})
+
+        wizard = self.env['sovos.cancel.invoice.wizard'].create({
+            'invoice_id': inv.id,
+            'cancel_reason': 'Tek taraflı iptal denemesi',
+            'gib_portal_confirmed': True,
+        })
+
+        with self.assertRaises(UserError) as cm:
+            wizard.action_cancel()
+
+        self.assertIn('tek taraflı', str(cm.exception).lower())
+        self.assertEqual(inv.x_efatura_status, 'sent')
 
     # ════════════════════════════════════════════════════════════════════
     # ACCEPTED FATURA KORUMASI
@@ -277,7 +310,7 @@ class TestCancelWizard(SovosTestCommon):
         wizard = self.env['sovos.cancel.invoice.wizard'].create({
             'invoice_id': inv.id,
             'cancel_reason': 'Kabul sonrası iptal denemesi',
-            'x_confirm_cancel': True,
+            'gib_portal_confirmed': True,
         })
 
         with self.assertRaises(UserError) as cm:
@@ -295,7 +328,7 @@ class TestResendWizard(SovosTestCommon):
 
     Yeniden gönderim tipleri:
         same_uuid → Aynı UUID, teknik hatalar için (GİB'in kendi hataları)
-        new_uuid  → Yeni UUID, içerik hataları için (1104 gibi)
+        new_invoice → İçerik hatası (1104 gibi): iptal + yeni fatura (wizard yönlendirir)
     """
 
     # ════════════════════════════════════════════════════════════════════
@@ -334,15 +367,11 @@ class TestResendWizard(SovosTestCommon):
             'same_uuid tipinde UUID değişmemeli')
         self.assertEqual(inv.x_efatura_status, 'sent')
 
-    def test_resend_new_uuid_for_1104(self):
+    def test_resend_new_invoice_type_redirects_to_cancel(self):
         """
-        1104 hatası → yeni UUID ile yeniden gönderilmeli.
-
-        1104 açıklaması: Fatura içeriğinde kritik hata.
-        Çözüm: İçerik düzeltildi, yeni UUID ile yeni fatura olarak gönder.
-
-        UUID değişmeli: eski UUID GİB'te "hatalı" olarak işaretli,
-        aynı UUID ile göndermek çakışmaya yol açar.
+        1104 gibi içerik hatalarında wizard 'new_invoice' önerir ama bu akışı
+        kendisi yürütmez: kullanıcı faturayı iptal edip yeni fatura kesmelidir.
+        UUID ve hata durumu değişmemeli.
         """
         inv = self._create_sent_invoice()
         inv.write({
@@ -353,41 +382,28 @@ class TestResendWizard(SovosTestCommon):
 
         wizard = self.env['sovos.resend.invoice.wizard'].create({
             'invoice_id': inv.id,
-            'resend_type': 'new_uuid',
-        })
-
-        with self._mock_ubl_builder(), \
-             self._mock_validator_valid(), \
-             self._mock_sovos_invoice_success():
-            wizard.action_resend()
-
-        # UUID DEĞİŞMELİ
-        self.assertNotEqual(inv.x_sovos_uuid, original_uuid,
-            'new_uuid tipinde UUID yenilenmeli')
-        self.assertTrue(inv.x_sovos_uuid,
-            'Yeni UUID boş olamaz')
-
-    def test_resend_requires_correct_type_for_error_code(self):
-        """
-        1103 hatası için new_uuid tipi seçilirse UserError.
-
-        İş kuralı uyumu:
-            1103 → same_uuid ile çözülmeli (RETRY_SAME_UUID setinde)
-            Kullanıcı yanlış tip seçtiyse düzelt, engelme.
-        """
-        inv = self._create_sent_invoice()
-        inv.write({'x_efatura_status': 'error', 'x_gib_status_code': 1103})
-
-        wizard = self.env['sovos.resend.invoice.wizard'].create({
-            'invoice_id': inv.id,
-            'resend_type': 'new_uuid',   # yanlış tip! 1103 için same_uuid olmalı
+            'resend_type': 'new_invoice',
         })
 
         with self.assertRaises(UserError) as cm:
             wizard.action_resend()
 
-        # Hata mesajında "aynı UUID" kullanması gerektiği belirtilmeli
-        self.assertIn('same_uuid', str(cm.exception).lower())
+        self.assertIn('iptal', str(cm.exception).lower())
+        self.assertEqual(inv.x_sovos_uuid, original_uuid)
+        self.assertEqual(inv.x_efatura_status, 'error')
+
+    def test_resend_onchange_suggests_type_by_error_code(self):
+        """
+        Sihirbaz GİB koduna göre tür önerir:
+            1103 (GIB_RETRY_SAME_UUID) → same_uuid
+            1104 (içerik hatası)       → new_invoice
+        """
+        inv = self._create_sent_invoice()
+        for code, expected in ((1103, 'same_uuid'), (1104, 'new_invoice')):
+            inv.write({'x_efatura_status': 'error', 'x_gib_status_code': code})
+            wizard = self.env['sovos.resend.invoice.wizard'].new({'invoice_id': inv.id})
+            wizard._onchange_invoice()
+            self.assertEqual(wizard.resend_type, expected, 'GİB kodu %s' % code)
 
     def test_resend_blocked_for_accepted_invoice(self):
         """

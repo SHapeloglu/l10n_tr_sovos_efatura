@@ -125,7 +125,7 @@ class TestGibStatusCodes(SovosTestCommon):
         Bu sayede kod değişikliği anında test devreye girer.
         """
         # Modülden direkt import et (sabitleri test ediyoruz)
-        from l10n_tr_sovos_efatura.models.account_move import GIB_SUCCESS, GIB_ACCEPTED_BY_RECEIVER
+        from odoo.addons.l10n_tr_sovos_efatura.models.account_move import GIB_SUCCESS, GIB_ACCEPTED_BY_RECEIVER
 
         self.assertNotIn(1305, GIB_SUCCESS,
             '1305 GIB_SUCCESS içinde olmamalı (v6.1 düzeltmesi)')
@@ -203,7 +203,7 @@ class TestGibStatusCodes(SovosTestCommon):
             (patch() modül seviyesinde, patch.object() instance/sınıf seviyesinde)
         """
         # patch.object: self.inv'in _notify_admin_gib_error metodunu izle
-        with patch.object(self.inv, '_notify_admin_gib_error') as mock_notify:
+        with patch.object(type(self.inv), '_notify_admin_gib_error') as mock_notify:
             self.inv._process_gib_status(1104)
             # Bildirim tam olarak 1 kez çağrılmalı
             mock_notify.assert_called_once()
@@ -221,7 +221,7 @@ class TestGibStatusCodes(SovosTestCommon):
         Bu ciddi bir hatadır — UUID generator'da sorun var demek.
         Admin bilgilendirilmeli, manuel inceleme gerekebilir.
         """
-        with patch.object(self.inv, '_notify_admin_gib_error') as mock_notify:
+        with patch.object(type(self.inv), '_notify_admin_gib_error') as mock_notify:
             self.inv._process_gib_status(1163)
             mock_notify.assert_called_once()
         self.assertEqual(self.inv.x_efatura_status, 'error')
@@ -285,7 +285,7 @@ class TestGibStatusCodes(SovosTestCommon):
             Bu test mevcut yanlış davranışı belgeler.
             Düzeltme sonrası TODO yorumları aktive edilmeli.
         """
-        with patch.object(self.inv, '_notify_admin_gib_error') as mock_notify:
+        with patch.object(type(self.inv), '_notify_admin_gib_error') as mock_notify:
             self.inv._process_gib_status(1215)
             mock_notify.assert_called_once()
 
@@ -316,8 +316,8 @@ class TestGibStatusCodes(SovosTestCommon):
         symmetric_difference(): A'da olup B'de olmayan VEYA B'de olup A'da olmayan elemanlar.
         Boş set dönmesi = tamamen aynılar.
         """
-        from l10n_tr_sovos_efatura.models.account_move import GIB_RETRY_SAME_UUID
-        from l10n_tr_sovos_efatura.wizards.resend_invoice_wizard import RETRY_SAME_UUID
+        from odoo.addons.l10n_tr_sovos_efatura.models.account_move import GIB_RETRY_SAME_UUID
+        from odoo.addons.l10n_tr_sovos_efatura.wizards.resend_invoice_wizard import RETRY_SAME_UUID
 
         diff = GIB_RETRY_SAME_UUID.symmetric_difference(RETRY_SAME_UUID)
         self.assertEqual(diff, set(),
@@ -429,7 +429,7 @@ class TestGibStatusCodes(SovosTestCommon):
 
         Bu test her bilinen kod için boş olmayan mesaj döndüğünü doğrular.
         """
-        from l10n_tr_sovos_efatura.models.account_move import _gib_msg
+        from odoo.addons.l10n_tr_sovos_efatura.models.account_move import _gib_msg
         # Bilinen tüm kritik kodlar için mesaj var mı?
         for code in [1101, 1103, 1104, 1150, 1160, 1215, 1300, 1305, 1310]:
             msg = _gib_msg(code)

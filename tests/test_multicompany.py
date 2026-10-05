@@ -69,7 +69,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         Şirket 1 faturası gönderilirken SovosInvoiceService Şirket 1
         credentials'ı (user/pass) ile başlatılmalı.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         inv = self._create_invoice(partner=self.partner_efatura)
 
@@ -107,7 +107,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         AC-11 — Kritik İzolasyon: Şirket 2 faturasında Şirket 1'in
         credentials'ı (test_invoice_user) kullanılmamalı.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         # Şirket 2 bağlamında fatura oluştur
         partner2 = self.env['res.partner'].with_company(self.company2).create({
@@ -157,7 +157,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         AC-11: e-Arşiv gönderiminde SovosArchiveService doğru şirket
         archive credentials'ı kullanmalı.
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         inv = self._create_invoice(partner=self.partner_earsiv)
 
@@ -205,7 +205,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         BRD FR-39: Bağlantı testi butonu şirkete özel credentials kullanmalı.
         Şirket 1'in bağlantı testi Şirket 2'nin bilgileriyle yapılmamalı.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         captured = []
 
@@ -230,7 +230,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         FR-39: e-Arşiv bağlantı testi ArchiveService credentials'ı kullanmalı.
         InvoiceService credentials'ı ile ArchiveService test edilmemeli.
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         captured = []
 
@@ -262,7 +262,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
             processed_companies.append(company.id)
 
         sync = self.env['sovos.sync']
-        with patch.object(sync, '_notify_admin'):
+        with patch.object(type(sync), '_notify_admin'):
             sync._cron_run_for_all_companies('cron_sync_incoming_invoices',
                                              task_fn=fake_task
                                              if hasattr(sync._cron_run_for_all_companies,
@@ -281,7 +281,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         AC-11: Şirket A'da exception olduğunda Şirket B'nin credentials'ı
         Şirket A'nın hata mesajında görünmemeli.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         company_a_inv = self._create_invoice(partner=self.partner_efatura)
 
@@ -314,7 +314,7 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         şirketin x_sovos_sender_vkn'i olmalı.
         Şirket A'nın VKN'i Şirket B faturasında görünmemeli.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         inv = self._create_invoice(partner=self.partner_efatura)
 

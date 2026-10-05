@@ -211,7 +211,7 @@ class TestVknCache(SovosTestCommon):
         inv = self._create_invoice(partner=self.partner_efatura)
 
         with patch(
-            'l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
+            'odoo.addons.l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
         ) as mock_refresh, \
              self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
@@ -231,7 +231,7 @@ class TestVknCache(SovosTestCommon):
         inv = self._create_invoice(partner=self.partner_no_cache)
 
         with patch(
-            'l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
+            'odoo.addons.l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
         ) as mock_refresh, \
              self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
@@ -257,7 +257,7 @@ class TestVknCache(SovosTestCommon):
         inv = self._create_invoice(partner=self.partner_efatura)
 
         with patch(
-            'l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
+            'odoo.addons.l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
         ) as mock_refresh, \
              self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
