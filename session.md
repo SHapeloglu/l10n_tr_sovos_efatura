@@ -23,6 +23,9 @@ sunucu conf sıkılaştırması (db_name/dbfilter/list_db, http_interface 127.0.
 - Diğer DB'ler: `olap_test` (50 modül, servis yok), `isg` (59, odoo18-isg 8078), `odoo` (11, boş), `sovos_ci_test` (geçici).
 - `custom_addons/l10n_tr_sovos_efatura.bak_20260628` Odoo'ca modül sanılıp odoo18-test modül listesine kaydedilmiş → `/opt/odoo/backups/`'a taşınmalı.
 - Diğer özel modüller (nakliye_yonetim, mail_gateway*, wa_erp_bot) bu repoda değil; sürüm takibi/yedek durumu bilinmiyor.
+- Veri sayımı: `odoo18-test` 0 fatura / 6 partner / son giriş 2026-08-14; `olap_test` 0 / 14 / 2026-06-24; `olap_prod`'da muhasebe yok.
+  → **Hiçbir ortamda gerçek iş verisi yok; e-Fatura canlıda değil.** odoo18-test geliştirme ortamı — güncelleme güvenli.
+  Canlıya geçiş ileride: `olap_prod`'a uygulamalar + özel modüller kurulacak (kullanıcı onayıyla).
 
 ---
 

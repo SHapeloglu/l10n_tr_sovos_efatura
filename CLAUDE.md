@@ -8,7 +8,7 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 ## 📍 Kaldığımız yer (2026-10-06)
 
 - **Modül:** 18.0.8.0.5 — 229 test temiz DB'de geçiyor; sunucu klasörü güncellendi, `odoo18-test` `-u` yapıldı, prod yeniden başlatıldı (hatasız). PR #1 `main`'e birleştirildi (2026-10-06) — `main` artık sunucudaki kopyayla aynı sürümde.
-- **⚠ Ortamlar:** `olap_prod` boş (12 çekirdek modül, uygulama yok). Muhasebe/satış/stok + özel modüller (`l10n_tr_sovos_efatura`, `nakliye_yonetim`, `mail_gateway*`, `wa_erp_bot`) yalnızca `odoo18-test`'te → gerçek veri orada olabilir; `odoo18-test`'te `-u`/`-i` öncesi yedek al ve kullanıcıya sor.
+- **Ortamlar (2026-10-06):** hiçbir DB'de gerçek iş verisi yok (odoo18-test: 0 fatura, 6 partner). `olap_prod` boş (12 çekirdek modül). Tüm projeler (`l10n_tr_sovos_efatura`, `nakliye_yonetim`, `mail_gateway*`, `wa_erp_bot` + muhasebe/satış/stok) `odoo18-test`'te — geliştirme ortamı. e-Fatura canlıda değil; canlıya geçiş = `olap_prod`'a kurulum (kullanıcı onayıyla).
 - **⚠ Prod DB'de modül kurulu görünmüyor:** 2026-10-06'da `olap_prod` → `ir_module_module` satırı `uninstalled` (`odoo18-test`'te `installed|18.0.8.0.5`). Prod servisi klasörü yüklüyor ama modül prod DB'de etkin değil; doğrula, kurulum (`-i`) yalnızca kullanıcı onayıyla.
 - **Sunucu sıkılaştırma yapıldı:** conf'larda `db_name`/`dbfilter`/`list_db=False`, `http_interface=127.0.0.1`, `proxy_mode=True`, yeni `admin_passwd`; PostgreSQL 5432 4 IP'ye daraltıldı, pg_hba `hostssl`.
 - **Bekleyen (kullanıcıda):** DNS panellerine A kayıtları (95.111.242.96) → `certbot renew` — 7 sertifika süresi dolmuş, adımlar `task.md`'de. Kayıtlar `dig` ile görünmeden certbot çalıştırma (LE: saatte 5 başarısız deneme).

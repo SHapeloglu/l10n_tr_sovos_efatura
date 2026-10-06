@@ -15,9 +15,8 @@
 - [ ] **Güvenlik (sunucu, modül dışı):** Ollama 11434 (auth yok, herkese açık), VNC 5901, Docker 8090 (ufw'yi atlar), 8080 — kullanıcı kim/nereden kullanıldığını bildirecek
 - [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
 
-- [ ] **Ortam netleştirme:** `olap_prod` boş (12 çekirdek modül); tüm projeler `odoo18-test`'te → gerçek kullanım hangi DB'de? (fatura/partner sayısı + son giriş sorgusu kullanıcıya verildi). Cevaba göre "test önce" akışını yeniden kur (ör. odoo18-test'in kopyasından ayrı bir deneme DB'si)
 - [ ] `custom_addons/l10n_tr_sovos_efatura.bak_20260628` → `/opt/odoo/backups/` taşı (Odoo modül listesine karışıyor)
-- [ ] **Prod DB'de modül durumu:** `olap_prod`'da `l10n_tr_sovos_efatura` `uninstalled` görünüyor — doğrula; prod'da kullanılacaksa önce `olap_prod` yedeği, sonra `-i l10n_tr_sovos_efatura` (kullanıcı onayıyla, Sovos şirket ayarları + test modu açık başla)
+- [ ] **Canlıya geçiş planı (ileride):** `olap_prod` boş — Muhasebe/Satış/Stok vb. + özel modüller (`l10n_tr_sovos_efatura`, `nakliye_yonetim`, `mail_gateway*`, `wa_erp_bot`) kurulacak; şirket + Sovos ayarları, test modu açık başla; önce DB yedeği (kullanıcı onayıyla)
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
 - [ ] (İsteğe bağlı) Hata yolunda doğrulama XML eki / `x_validation_errors` rollback'te kayboluyor; kalıcı olması istenirse hata sonrası ayrı bir 'hata raporu' adımı tasarla (ayrı cursor kilitlenme riski nedeniyle reddedildi)
 - [ ] **HATA — gelen fatura cron'u çalışmıyor:** `sovos_sync._sync_incoming_for_company` → `svc.get_inbound_list()` parametresiz; imza `get_inbound_list(date_from, date_to)` → her çalışmada `TypeError` + admin bildirimi. Son senkron tarihinden bugüne gün gün döngü kur (GetUblList ≤ 1 gün); `test_cron` ve `test_incoming`'deki `get_inbound_list` yamalarını `autospec=True` yap ki imza hatası testte yakalansın
@@ -32,6 +31,7 @@
 _(şu anda boş)_
 
 ## ✅ Tamamlanan
+- [x] Ortam envanteri: hiçbir DB'de gerçek veri yok (odoo18-test 0 fatura); `olap_prod` boş; projeler odoo18-test'te (2026-10-06)
 - [x] Gelen fatura testleri: `tests/test_incoming.py` — UBL parser (XXE dahil), eşleme motoru (VKN / unvan benzerliği / öğrenen tablo / UBL kodu / kural + difflib eşikleri), vergi-birim-gider hesabı, öğrenen tablo kısıtları, uçtan uca senkron (matched_auto / review / pending, döviz, UBL hatası), eşleme sihirbazı; `sovos_ci_test`'te 288 testin tamamı geçti (2026-10-06)
 - [x] PR #1 (v8 + güvenlik + Odoo 18 uyumu, 18.0.8.0.5) `main`'e birleştirildi (2026-10-06)
 - [x] Odoo conf: `http_interface = 127.0.0.1`, `proxy_mode = True`, yeni `admin_passwd` — nginx üzerinden 200 (2026-10-06)
