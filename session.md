@@ -63,6 +63,14 @@
     gösteriliyor (alan/ek rollback'te kaybolduğu için).
   - Bilinen sınırlama: hata yolunda doğrulama XML eki ve x_validation_errors kalıcı değil (task.md).
 
+- 8. çalıştırma (18.0.8.0.5, `sovos_ci_test`, temiz DB + l10n_tr): **tüm testler geçti** —
+  `odoo.tests.stats: l10n_tr_sovos_efatura: 229 tests 126.26s` (alt testler dahil), failure/error yok.
+  Log'daki 2 ERROR satırı testlerin bilerek ürettiği kayıtlar (cron "Şirket 1 hatası", XPath beklenmedik hata).
+
+**Sıradaki adım:** Sunucu kopyasını repodan güncelle — ⚠ `odoo18-prod` ve `odoo18-test` aynı klasörü
+yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/worker yenilemede alır.
+18.0.8.0.0 → 18.0.8.0.5 arasında alan/görünüm değişikliği yok (yalnızca Python), yine de prod `-u` kullanıcı onayıyla.
+
 ---
 
 ## Önceki Çalışmalar
