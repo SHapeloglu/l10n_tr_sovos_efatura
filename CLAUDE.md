@@ -7,7 +7,8 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 
 ## 📍 Kaldığımız yer (2026-10-06)
 
-- **Modül:** 18.0.8.0.5 — 229 test temiz DB'de geçiyor; sunucu klasörü güncellendi, `odoo18-test` `-u` yapıldı, prod yeniden başlatıldı (hatasız). PR: https://github.com/SHapeloglu/l10n_tr_sovos_efatura/pull/1 (dal `claude/epic-hypatia-m35jhz`, henüz merge edilmedi).
+- **Modül:** 18.0.8.0.5 — 229 test temiz DB'de geçiyor; sunucu klasörü güncellendi, `odoo18-test` `-u` yapıldı, prod yeniden başlatıldı (hatasız). PR #1 `main`'e birleştirildi (2026-10-06) — `main` artık sunucudaki kopyayla aynı sürümde.
+- **⚠ Prod DB'de modül kurulu görünmüyor:** 2026-10-06'da `olap_prod` → `ir_module_module` satırı `uninstalled` (`odoo18-test`'te `installed|18.0.8.0.5`). Prod servisi klasörü yüklüyor ama modül prod DB'de etkin değil; doğrula, kurulum (`-i`) yalnızca kullanıcı onayıyla.
 - **Sunucu sıkılaştırma yapıldı:** conf'larda `db_name`/`dbfilter`/`list_db=False`, `http_interface=127.0.0.1`, `proxy_mode=True`, yeni `admin_passwd`; PostgreSQL 5432 4 IP'ye daraltıldı, pg_hba `hostssl`.
 - **Bekleyen (kullanıcıda):** DNS panellerine A kayıtları (95.111.242.96) → `certbot renew` — 7 sertifika süresi dolmuş, adımlar `task.md`'de. Kayıtlar `dig` ile görünmeden certbot çalıştırma (LE: saatte 5 başarısız deneme).
 - **Bekleyen (karar):** Ollama 11434 / VNC 5901 / Docker 8090 / 8080 kim kullanıyor; kullanılmayan alan adları.

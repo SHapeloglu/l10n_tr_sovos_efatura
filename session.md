@@ -123,6 +123,12 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     api/fretflow; powerbiegitimi.com (webdehasi, 2026-08-31): erpopenpy/nexmeet. Çözüm DNS panellerinde (sunucudan yapılamaz);
     kayıtlar eklenince `certbot renew && systemctl reload nginx`.
 
+- **Durum kontrolü + PR birleştirme (kullanıcı onayıyla):**
+  - Sürümler: repo dalı, sunucu klasörü ve `odoo18-test` DB → 18.0.8.0.5; GitHub `main` 18.0.6.0.0'da kalmıştı.
+  - **Yeni bulgu:** `olap_prod` DB'de modül `uninstalled` — prod servisi kodu yüklüyor ama modül prod'da kurulu değil
+    ("prod DB'de `-u` gerekmiyor" notu bu yüzden de geçerli). Prod'da kullanım için `-i` ve kullanıcı kararı gerekiyor (task.md).
+  - PR #1 `main`'e birleştirildi (merge commit; dal geçmişi korundu).
+
 ---
 
 ## Önceki Çalışmalar
