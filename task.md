@@ -18,7 +18,11 @@
 - [ ] **Prod DB'de modül durumu:** `olap_prod`'da `l10n_tr_sovos_efatura` `uninstalled` görünüyor — doğrula; prod'da kullanılacaksa önce `olap_prod` yedeği, sonra `-i l10n_tr_sovos_efatura` (kullanıcı onayıyla, Sovos şirket ayarları + test modu açık başla)
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
 - [ ] (İsteğe bağlı) Hata yolunda doğrulama XML eki / `x_validation_errors` rollback'te kayboluyor; kalıcı olması istenirse hata sonrası ayrı bir 'hata raporu' adımı tasarla (ayrı cursor kilitlenme riski nedeniyle reddedildi)
-- [ ] v8 yeni özellikleri için test yaz: `ubl_parser`, `incoming_matcher`, `efatura.product.mapping`, gelen fatura eşleme sihirbazı (şu an testi yok)
+- [ ] **HATA — gelen fatura cron'u çalışmıyor:** `sovos_sync._sync_incoming_for_company` → `svc.get_inbound_list()` parametresiz; imza `get_inbound_list(date_from, date_to)` → her çalışmada `TypeError` + admin bildirimi. Son senkron tarihinden bugüne gün gün döngü kur (GetUblList ≤ 1 gün); `test_cron` ve `test_incoming`'deki `get_inbound_list` yamalarını `autospec=True` yap ki imza hatası testte yakalansın
+- [ ] **HATA — eşleme sihirbazı satırsız açılıyor:** `incoming_invoice_match_wizard.default_get` `line_ids` üretmiyor → arayüzden ürün eşleme ve öğrenen tabloya kayıt yapılamıyor. Faturanın satırlarından wizard satırı üret, `IncomingMatcher.find_product` önerisiyle ön doldur; `test_incoming.TestIncomingMatchWizard`'a default_get satır testi ekle
+- [ ] **HATA — pasif döviz:** `sovos_sync._find_currency` pasif para birimini bulamıyor → dövizli fatura TRY olarak kaydediliyor. `active_test=False` ile ara; pasifse 'pending' + not
+- [ ] (Küçük) `efatura.product.mapping.find_mapping` `=ilike` kullanıyor: açıklamadaki `%`/`_` joker gibi davranır, Türkçe `ı/I`–`i/İ` harf eşlemesi yapılmaz. Joker karakterleri kaçışla veya Python'da `casefold` karşılaştırması yap
+- [ ] (Küçük) `test_cron`'daki gelen fatura testleri `get_invoice_ubl`'ı yamalamıyor → gerçek SOAP isteği deneniyor (Odoo test çatısı engelliyor, log'da "External requests verboten")
 - [ ] `l10n_tr_sovos_efatura.bak_20260628` yedeğinin gerekliliğini kullanıcıyla değerlendir
 
 ## 🚧 Devam Eden
@@ -26,6 +30,7 @@
 _(şu anda boş)_
 
 ## ✅ Tamamlanan
+- [x] Gelen fatura testleri: `tests/test_incoming.py` — UBL parser (XXE dahil), eşleme motoru (VKN / unvan benzerliği / öğrenen tablo / UBL kodu / kural + difflib eşikleri), vergi-birim-gider hesabı, öğrenen tablo kısıtları, uçtan uca senkron (matched_auto / review / pending, döviz, UBL hatası), eşleme sihirbazı; `sovos_ci_test`'te 288 testin tamamı geçti (2026-10-06)
 - [x] PR #1 (v8 + güvenlik + Odoo 18 uyumu, 18.0.8.0.5) `main`'e birleştirildi (2026-10-06)
 - [x] Odoo conf: `http_interface = 127.0.0.1`, `proxy_mode = True`, yeni `admin_passwd` — nginx üzerinden 200 (2026-10-06)
 - [x] PostgreSQL 5432 ufw kuralı 4 IP'ye daraltıldı; pg_hba `host` → `hostssl` (2026-10-06)

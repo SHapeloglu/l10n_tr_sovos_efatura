@@ -44,7 +44,7 @@ action_post() veya Toplu Gönder
 | `data/ir_cron_data.xml` | Cron'lar (aşağıda) |
 | `data/ir_sequence_data.xml` | Fatura numara serileri |
 | `views/` | Şirket, cari, fatura formu ve liste/dashboard görünümleri |
-| `tests/` | 11 test dosyası: account_move, accounting, atomic_number, cron, gib_status, multicompany, ubl_builder, ubl_validator, vkn_cache, wizards, extras |
+| `tests/` | 12 test dosyası: account_move, accounting, atomic_number, cron, gib_status, multicompany, ubl_builder, ubl_validator, vkn_cache, wizards, extras, incoming |
 
 ## Zamanlanmış Görevler
 

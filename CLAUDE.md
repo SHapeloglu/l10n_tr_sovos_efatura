@@ -12,7 +12,7 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 - **Sunucu sıkılaştırma yapıldı:** conf'larda `db_name`/`dbfilter`/`list_db=False`, `http_interface=127.0.0.1`, `proxy_mode=True`, yeni `admin_passwd`; PostgreSQL 5432 4 IP'ye daraltıldı, pg_hba `hostssl`.
 - **Bekleyen (kullanıcıda):** DNS panellerine A kayıtları (95.111.242.96) → `certbot renew` — 7 sertifika süresi dolmuş, adımlar `task.md`'de. Kayıtlar `dig` ile görünmeden certbot çalıştırma (LE: saatte 5 başarısız deneme).
 - **Bekleyen (karar):** Ollama 11434 / VNC 5901 / Docker 8090 / 8080 kim kullanıyor; kullanılmayan alan adları.
-- **Sonraki modül işi:** gelen fatura testleri (`ubl_parser`, `incoming_matcher`, `efatura.product.mapping`, eşleme sihirbazı).
+- **Sonraki modül işi:** gelen fatura hataları (task.md: cron tarihsiz çağrı, sihirbaz satırları, pasif döviz) — testleri `tests/test_incoming.py`'de.
 - Kullanıcı sunucuda root; komutları kullanıcı çalıştırıp çıktıyı yapıştırıyor (oturumdan SSH yok). Uzun komutları `cat > script.sh <<'EOF'` + `bash script.sh` biçiminde ver — doğrudan yapıştırmada satırlar karışıyor.
 - Test çalıştırma: `bash /tmp/sovos_pr/run_tests.sh` (geçici `sovos_ci_test` DB, `/tmp/sovos_pr` klonu). Odoo başarıda "failures" satırı yazmaz; `odoo.tests.stats` satırına bak.
 
@@ -32,7 +32,7 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 ```bash
 # Kurulum / güncelleme (sunucuda test ortamı)
 sudo -u odoo /opt/odoo/venv18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo/odoo18-test.conf -d odoo18-test -u l10n_tr_sovos_efatura --stop-after-init
-# Testler (Odoo test çatısı; tests/ altında 11 dosya)
+# Testler (Odoo test çatısı; tests/ altında 12 dosya)
 sudo -u odoo /opt/odoo/venv18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo/odoo18-test.conf -d odoo18-test --test-tags /l10n_tr_sovos_efatura -u l10n_tr_sovos_efatura --stop-after-init
 # GİB şemaları (v8): bash setup_schemas.sh UBL-TR1.2.1_Paketi.zip e-FaturaPaketi.zip
 ```
