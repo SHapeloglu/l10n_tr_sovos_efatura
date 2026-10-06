@@ -71,6 +71,13 @@
 yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/worker yenilemede alır.
 18.0.8.0.0 → 18.0.8.0.5 arasında alan/görünüm değişikliği yok (yalnızca Python), yine de prod `-u` kullanıcı onayıyla.
 
+- **Sunucu güncellendi (kullanıcı onayıyla):** `/opt/odoo/custom_addons/l10n_tr_sovos_efatura` → 18.0.8.0.5
+  (19 GİB şema dosyası korundu; `kaynaklar/*.xlsx` taşındı; `setup.exe` yalnızca yedekte).
+  Yedek: `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.0_20261006_025643`.
+  `odoo18-test` DB `-u` → `installed|18.0.8.0.5`, iki servis active. Log'daki tek ERROR
+  ("Importing test framework…") bu modülden değil, custom_addons'taki başka bir modülden.
+  Prod: workers=4 → işçiler yenilendikçe yeni Python kodu devreye girer; prod DB'de `-u` gerekmiyor.
+
 ---
 
 ## Önceki Çalışmalar
