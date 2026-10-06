@@ -2,7 +2,16 @@
 
 ## 🔜 Sıradaki
 
-- [ ] **Sunucu (modül dışı, kullanıcı DNS panelinde):** A kayıtlarını 95.111.242.96'ya ekle — olap.com.tr: odoo18-prod, odoo18-test; dehateknikservis.com (Wix): api, fretflow; powerbiegitimi.com: erpopenpy, nexmeet → sonra `certbot renew`; kullanılmayanların sertifikasını sil
+- [ ] **DNS + SSL sertifika yenileme (sunucu, modül dışı)** — 7 sertifika süresi dolmuş/dolacak; sebep: alt alan adlarının A kaydı yok (NXDOMAIN). 2026-10-06'da `certbot renew` denendi → 7 hata (beklenen; DNS henüz eklenmedi)
+  - [ ] Hangi alt alan adlarının hâlâ kullanıldığına karar ver (özellikle eski `odoo-test.olap.com.tr`)
+  - [ ] **mirahosting** paneli (`olap.com.tr`): A kaydı `odoo18-prod` → 95.111.242.96, `odoo18-test` → 95.111.242.96
+  - [ ] **Wix** paneli (`dehateknikservis.com`, Domains → DNS Records → A): `api`, `fretflow` → 95.111.242.96
+  - [ ] **webdehasi** paneli (`powerbiegitimi.com`): `erpopenpy`, `nexmeet` → 95.111.242.96
+  - [ ] Yayılımı doğrula — her satırda 95.111.242.96 görünmeli (görünmeden certbot çalıştırma; Let's Encrypt saatte 5 başarısız doğrulama sınırı):
+        `for d in odoo18-prod.olap.com.tr odoo18-test.olap.com.tr api.dehateknikservis.com fretflow.dehateknikservis.com erpopenpy.powerbiegitimi.com nexmeet.powerbiegitimi.com; do printf "%-34s %s\n" $d "$(dig +short A $d @8.8.8.8)"; done`
+  - [ ] Sertifikaları yenile: `certbot renew && systemctl reload nginx && certbot certificates | grep -E "Certificate Name|Expiry"`
+  - [ ] Kullanılmayan alan adları: `certbot delete --cert-name <ad>` + ilgili nginx site dosyasını `sites-enabled`'dan kaldır → `nginx -t && systemctl reload nginx`
+  - [ ] Tarayıcıdan `https://odoo18-prod.olap.com.tr` girişini doğrula (sertifika uyarısı olmamalı)
 - [ ] **Güvenlik (sunucu, modül dışı):** Ollama 11434 (auth yok, herkese açık), VNC 5901, Docker 8090 (ufw'yi atlar), 8080 — kullanıcı kim/nereden kullanıldığını bildirecek
 - [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
 
