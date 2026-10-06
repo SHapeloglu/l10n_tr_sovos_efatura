@@ -2,7 +2,7 @@
 
 ## 🔜 Sıradaki
 
-- [ ] **Güvenlik (sunucu, modül dışı):** prod/test conf'a `list_db = False` + `dbfilter` + güçlü `admin_passwd`; Odoo portlarını 127.0.0.1'e bağla, nginx HTTPS — kullanıcı onayıyla
+- [ ] **Güvenlik (sunucu, modül dışı):** Odoo portlarını (8074-8077) 127.0.0.1'e bağla + nginx HTTPS; `admin_passwd` gücünü kontrol et — kullanıcı onayıyla
 - [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
 
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
@@ -15,6 +15,7 @@
 _(şu anda boş)_
 
 ## ✅ Tamamlanan
+- [x] prod/test conf: `db_name` + anchor'lı `dbfilter` + `list_db = False` — servisler arası çapraz cron çalışması ve DB yöneticisi kapatıldı (2026-10-06)
 - [x] `odoo18-prod` 18.0.8.0.5 koduyla yeniden başlatıldı, hata yok (2026-10-06)
 - [x] Sunucu klasörü 18.0.8.0.5'e güncellendi, `odoo18-test` DB `-u` başarılı (2026-10-06)
 - [x] Modül testleri temiz DB'de (`sovos_ci_test`) tamamen geçiyor — 18.0.8.0.5, 229 test (2026-10-06)

@@ -84,6 +84,14 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     prod tüm DB'leri (odoo18-test, sovos_ci_test, isg) sunuyor ve `/web/database/manager` internetten erişilebilir
     (Haziran'da "Database creation error"); port dışa açık (TLS tarayıcıları). Öneri: `list_db = False`,
     `dbfilter = ^olap_prod$`, güçlü `admin_passwd`, portları 127.0.0.1 + nginx HTTPS. `isg` DB'de 31 isg_* modülü eksik.
+  - **Düzeltme:** prod conf'ta `dbfilter = olap_prod` zaten vardı (web tarafı kısıtlıydı). Asıl sorun cron: `db_name`
+    olmadığı için Odoo cron'u tüm DB'lerde dolaşıyordu — prod servisi odoo18-test/isg/sovos_ci_test cron'larını,
+    **test servisi de `olap_prod` cron'larını** çalıştırıyordu (test log'unda dakikada bir `dbname=olap_prod` bağlantısı).
+  - **Uygulandı (kullanıcı onayıyla, conf yedekleri `/etc/odoo/*.conf.bak_*`):**
+    prod → `db_name = olap_prod`, `dbfilter = ^olap_prod$`, `list_db = False`;
+    test → `db_name = odoo18-test`, `dbfilter = ^odoo18-test$`, `list_db = False`. İki servis yeniden başlatıldı, active;
+    prod login 200, `/web/database/manager` "disabled by the administrator".
+  - Kalan: Odoo portlarını 127.0.0.1'e bağla + nginx HTTPS; `admin_passwd` gücünü kontrol et; `sovos_ci_test` DB'sini sil; `isg` DB eksik modüller.
 
 ---
 
