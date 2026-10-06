@@ -12,4 +12,5 @@ from . import (
     test_extras,          # e-posta, bağlantı testi, kur farkı, dashboard
     test_multicompany,    # çok şirket credentials izolasyonu (AC-11)
     test_ubl_builder,     # UBL XML yapısı, ZIP içeriği, CopyIndicator (AC-12)
+    test_incoming,        # gelen fatura: UBL parser, eşleme motoru, öğrenen tablo, sihirbaz
 )

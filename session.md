@@ -129,6 +129,14 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     ("prod DB'de `-u` gerekmiyor" notu bu yüzden de geçerli). Prod'da kullanım için `-i` ve kullanıcı kararı gerekiyor (task.md).
   - PR #1 `main`'e birleştirildi (merge commit; dal geçmişi korundu).
 
+- **Gelen fatura testleri (dal `test/gelen-fatura`):** `tests/test_incoming.py` — 45 test; `sovos_ci_test`'te `-u` ile
+  tüm paket **288 test, failure/error yok** (`odoo18-test` servisi durdurulmadan, `--http-port=8099`).
+  - Testler yazılırken bulunan hatalar (kod değiştirilmedi; task.md + `/root/ISLISTESI.md` Aktif 6–8):
+    gelen fatura cron'u `get_inbound_list()`'i tarihsiz çağırıyor → her çalışmada TypeError;
+    eşleme sihirbazı `line_ids` üretmiyor → öğrenen tablo arayüzden hiç dolmuyor;
+    `_find_currency` pasif dövizi bulamıyor → dövizli fatura TRY kaydoluyor.
+  - Testler mevcut davranışı doğruluyor; bu hatalar düzeltilince ilgili testler (autospec, sihirbaz satırları) eklenecek.
+
 ---
 
 ## Önceki Çalışmalar
