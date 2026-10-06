@@ -340,7 +340,7 @@ class TestCronSync(SovosTestCommon):
         # patch.object: sync instance'ının metodunu değiştir
         with patch.object(type(sync), '_sync_incoming_for_company', side_effect=failing_then_ok), \
              patch.object(type(sync), '_notify_admin'):   # bildirim de mock'la (gereksiz log)
-            sync._cron_run_for_all_companies('cron_sync_incoming_invoices')
+            sync._cron_run_for_all_companies('_sync_incoming_for_company')
 
         # Şirket 2 çağrıldı mı? (Şirket 1 çaksa bile)
         self.assertIn(company2.id, call_order,
@@ -433,10 +433,17 @@ class TestCronSync(SovosTestCommon):
             'customer_rank': 1,
         })
 
+        # autospec=True → mock 'self' (partner recordset) ile çağrılır; DB'deki
+        # demo partnerlar da bayat olabileceği için yalnızca test partnerına bakılır.
         with patch(
-            'odoo.addons.l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
+            'odoo.addons.l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type',
+            autospec=True,
         ) as mock_refresh:
             self.env['sovos.sync']._refresh_vkn_for_company(self.company)
 
+        refreshed_ids = set()
+        for c in mock_refresh.call_args_list:
+            refreshed_ids.update(c.args[0].ids)
         # Taze partner için refresh çağrılmamalı
-        mock_refresh.assert_not_called()
+        self.assertNotIn(self.partner_efatura.id, refreshed_ids,
+            'Taze cache\'li partner yenilenmemeli')

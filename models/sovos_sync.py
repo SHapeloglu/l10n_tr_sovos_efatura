@@ -33,10 +33,11 @@ class SovosSync(models.Model):
         companies = self.env['res.company'].search([
             ('x_sovos_invoice_user', '!=', False)
         ])
-        task_fn = getattr(self, task_fn_name)
         for company in companies:
             try:
-                task_fn(company)
+                # with_company: görev, env.company = ilgili şirket olacak şekilde çalışır
+                # (oluşturulan kayıtlar / varsayılan dergi-hesaplar doğru şirkete düşer)
+                getattr(self.with_company(company), task_fn_name)(company)
             except Exception as e:
                 _logger.error('[%s] %s hatası: %s', company.name, task_fn_name, e)
                 self._notify_admin(company, task_fn_name, str(e))

@@ -20,8 +20,10 @@ Risk Seviyesi: ORTA-YÜKSEK
   - XML içeriği hatalıysa GİB 1101/1132/1150 hatası alınır
   - ZIP/XML adı UUID ile uyuşmazsa GİB 1133/1142 hatası alınır (AC-12)
 """
-import zipfile
+import base64
 import io
+import re
+import zipfile
 from datetime import date
 from unittest.mock import patch, MagicMock
 
@@ -121,7 +123,10 @@ class TestUblBuilder(SovosTestCommon):
 
     def test_document_currency_code_try(self):
         """TRY faturada DocumentCurrencyCode = 'TRY'."""
-        root, _, _ = self._build()
+        # Şirket para birimi test DB'sine göre değişebilir (ör. USD) → TRY'yi açıkça ver
+        try_currency = self.env.ref('base.TRY')
+        try_currency.active = True
+        root, _, _ = self._build(currency_id=try_currency.id)
         self.assertEqual(_text(root, '//cbc:DocumentCurrencyCode'), 'TRY')
 
     # ── Tedarikçi (Supplier) Mapping ─────────────────────────────────────
@@ -300,8 +305,8 @@ class TestUblBuilder(SovosTestCommon):
 
     def test_send_ubl_uses_uuid_as_zip_filename(self):
         """
-        send_ubl() çağrısında Sovos'a iletilen fileName UUID.zip olmalı.
-        Spec §14.2: fileName=f'{uuid}.zip' — rand_no DEĞİL.
+        send_ubl() çağrısında DocData'daki ZIP, UUID.xml dosyasını içermeli
+        (GİB 1133/1142). Spec §14.2 — rand_no DEĞİL.
         """
         from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
@@ -320,9 +325,14 @@ class TestUblBuilder(SovosTestCommon):
             svc.send_ubl(b'<Invoice/>', test_uuid, self.partner_efatura, 'TICARIFATURA')
 
         self.assertTrue(captured_body, '_post çağrılmalıydı')
-        # fileName parametresi SOAP body'de UUID.zip olmalı
-        self.assertIn('%s.zip' % test_uuid, captured_body[0],
-            'send_ubl SOAP body\'de fileName=%s.zip olmalı' % test_uuid)
+        # sendUBLRequest'te fileName elemanı yok (Sovos örnek istemcisi); dosya adı
+        # DocData içindeki ZIP'te taşınır → ZIP içindeki XML adı UUID.xml olmalı.
+        m = re.search(r'<ein:DocData>([^<]+)</ein:DocData>', captured_body[0])
+        self.assertTrue(m, 'SOAP body\'de DocData bulunmalı')
+        with zipfile.ZipFile(io.BytesIO(base64.b64decode(m.group(1)))) as zf:
+            names = zf.namelist()
+        self.assertEqual(names, ['%s.xml' % test_uuid],
+            'send_ubl DocData ZIP içeriği %s.xml olmalı' % test_uuid)
 
     def test_send_invoice_archive_uses_uuid_as_filename(self):
         """

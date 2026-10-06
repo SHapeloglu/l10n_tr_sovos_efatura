@@ -9,8 +9,8 @@ Ne zaman kullanılır?
     VUK md.280 gereği kur farkı faturası ile bu fark belgelenir.
 
 Çalışma mantığı:
-    Orijinal faturayı kopyalar (copy()), e-Fatura alanlarını sıfırlar,
-    satırları temizler ve tek kalemlik kur farkı satırı ekler.
+    Orijinal faturanın başlık bilgileriyle (müşteri, döviz, dergi, senaryo)
+    create() ile yeni taslak fatura açar ve tek kalemlik kur farkı satırı ekler.
     Oluşturulan fatura taslak olarak açılır; kullanıcı inceleyip gönderir.
 
 Limitasyon:
@@ -57,15 +57,12 @@ class KurFarkiWizard(models.TransientModel):
 
         Akış:
           1. Uygunluk kontrolü (orijinal fatura gönderilmiş/kabul edilmiş mi?)
-          2. Orijinal faturayı kopyala (copy())
-          3. Kopyada e-Fatura alanlarını sıfırla
-          4. Tüm satırları temizle → tek kur farkı satırı ekle
-          5. Oluşturulan faturayı form view'da aç
+          2. Orijinalin başlık bilgileriyle (müşteri, döviz, dergi, senaryo)
+             create() ile yeni taslak fatura + tek kur farkı satırı oluştur
+          3. Oluşturulan faturayı form view'da aç
 
-        copy() neden kullanılıyor?
-            Odoo'nun copy() metodu fatura başlık bilgilerini (partner, döviz, dergi vb.)
-            kopyalar. Biz sadece satırları ve e-Fatura alanlarını değiştiriyoruz.
-            Bu sayede müşteri, tarih gibi alanları manuel doldurmak zorunda kalmıyoruz.
+        Gelir hesabı orijinal faturanın ilk ürün satırından alınır; yoksa
+        Odoo dergi/ürün varsayılanını kullanır.
         """
         self.ensure_one()
         original = self.original_invoice_id
@@ -76,31 +73,34 @@ class KurFarkiWizard(models.TransientModel):
                 'Kur farkı faturası sadece gönderilmiş/kabul edilmiş faturalar için oluşturulabilir.'
             ))
 
-        # Orijinal faturayı kopyala; bazı alanları override et
-        new_invoice = original.copy({
-            'invoice_date':          self.kur_farki_date,
-            'x_kur_farki':           True,     # "Kur farkı faturası" işareti
-            'x_efatura_status':      'draft',  # Yeni fatura taslaktan başlar
-            'x_sovos_uuid':          False,    # Yeni UUID atanacak (gönderimde)
-            'x_sovos_envelope_uuid': False,
-            'x_reserved_number':     False,    # Yeni numara alınacak (gönderimde)
-            'x_number_status':       False,
-            # (5, 0, 0): Tüm satırları sil
-            # ORM komutları: (0,0,vals)=ekle, (1,id,vals)=güncelle, (2,id)=sil, (5,0,0)=hepsini sil
-            'invoice_line_ids':      [(5, 0, 0)],
-        })
+        # Yeni faturayı create() ile oluştur.
+        # Odoo 18'de copy() + invoice_line_ids (5,0,0) ve ardından journal'ın
+        # default_account_id'si ile satır eklemek güvenilir değil (satış dergisinde
+        # hesap boş olabiliyor, copy() satırları/dinamik alanları taşıyor).
+        # Başlık alanlarını açıkça veriyoruz; e-Fatura alanları varsayılanlardan
+        # (taslak, UUID/numara boş) başlar.
+        line_vals = {
+            'name':       self.description or 'Kur Farkı — %s' % original.name,
+            'quantity':   1,
+            'price_unit': self.kur_farki_amount,
+            # KDV otomatik hesaplanmıyor (bkz. Limitasyon); kullanıcı düzenler
+            'tax_ids':    [(6, 0, [])],
+        }
+        income_account = original.invoice_line_ids.filtered(
+            lambda l: l.display_type == 'product')[:1].account_id
+        if income_account:
+            line_vals['account_id'] = income_account.id
 
-        # Kur farkı satırını ekle
-        new_invoice.write({
-            'invoice_line_ids': [(0, 0, {
-                # (0, 0, vals): Yeni satır ekle
-                'name':       self.description or 'Kur Farkı — %s' % original.name,
-                'quantity':   1,
-                'price_unit': self.kur_farki_amount,
-                # Varsayılan muhasebe hesabı: journal'ın default hesabı
-                # Kullanıcı faturayı düzenlerken değiştirebilir
-                'account_id': new_invoice.journal_id.default_account_id.id,
-            })]
+        new_invoice = self.env['account.move'].create({
+            'move_type':          original.move_type,
+            'partner_id':         original.partner_id.id,
+            'currency_id':        original.currency_id.id,
+            'journal_id':         original.journal_id.id,
+            'company_id':         original.company_id.id,
+            'invoice_date':       self.kur_farki_date,
+            'x_kur_farki':        True,     # "Kur farkı faturası" işareti
+            'x_efatura_scenario': original.x_efatura_scenario,
+            'invoice_line_ids':   [(0, 0, line_vals)],
         })
 
         # Oluşturulan faturayı form view'da aç (kullanıcı inceleyip gönderecek)

@@ -39,6 +39,20 @@
 
 **Sıradaki adım:** `/tmp/sovos_pr`'de `git pull` + testleri yeniden çalıştır.
 
+- 6. çalıştırma: 195 testte 18 failure + 11 error. Düzeltmeler (18.0.8.0.4):
+  - **Kod:** kur farkı sihirbazı `copy()` yerine `create()` (Odoo 18'de satır/hesap sorunu);
+    cron `_cron_run_for_all_companies` görevi `with_company(company)` ile çalıştırıyor;
+    1163 (mükerrer UUID) da admin'e bildiriliyor (1104 gibi, tüm GIB_CANCEL_AND_NEW).
+  - **Test:** `_create_sent_invoice` benzersiz numara/UUID; var olmayan `SovosInvoiceService.cancel_invoice`
+    yamaları kaldırıldı; satırsız muhasebe fişine dengeli satır; şirket 2'ye hesap planı;
+    e-Arşiv senaryosu açık; cron testleri `_sync_incoming_for_company` adıyla; 1215 testi
+    düzeltilmiş davranışa (status 'sent', tek bildirim); retry seti testi constants.py tek kaynak;
+    VKN cron testi yalnızca test partnerına bakıyor; send_ubl testi DocData ZIP içeriğine bakıyor;
+    DocumentCurrencyCode testi TRY'yi açıkça veriyor; ID format testi `cbc:ID` filtresi.
+  - **Açık (karar bekliyor):** test_atomic_number'daki 6 test `x_number_status='released'`
+    bekliyor; ancak `raise UserError` tüm transaction'ı geri aldığı için hata/serbest bırakma
+    bilgisi üretimde de kalıcı olmuyor. Tasarım kararı kullanıcıya soruldu.
+
 ---
 
 ## Önceki Çalışmalar

@@ -69,7 +69,7 @@ class TestEarsivEmail(SovosTestCommon):
             'email': False,
         })
 
-        inv = self._create_invoice(partner=partner_no_email)
+        inv = self._create_invoice(partner=partner_no_email, x_efatura_scenario='EARSIVFATURA')
 
         captured_calls = []
 

@@ -45,6 +45,9 @@ class SovosTestCommon(TransactionCase):
                     └── TransactionCase (Odoo base)
     """
 
+    # _create_sent_invoice için benzersiz numara/UUID sayacı
+    _sent_seq = 0
+
     @classmethod
     def setUpClass(cls):
         """
@@ -268,15 +271,21 @@ class SovosTestCommon(TransactionCase):
         # Önce normal taslak fatura oluştur
         inv = self._create_invoice(partner=partner, **kwargs)
 
+        # Aynı testte birden fazla gönderilmiş fatura oluşturulabilir (ör. dashboard);
+        # numara ve UUID her çağrıda benzersiz olmalı (mükerrer name → Odoo 18 hatası).
+        SovosTestCommon._sent_seq += 1
+        number = 'TST2026%09d' % SovosTestCommon._sent_seq
+        suffix = '%012d' % SovosTestCommon._sent_seq
+
         # Ardından "gönderilmiş" durumuna zorla
         # NOT: Normalde action_post() bunu yapar ama burada Sovos'u bypass ediyoruz
         inv.write({
             'state': 'posted',                          # Odoo muhasebe durumu: onaylandı
-            'name': 'TST2026000000001',                 # Atanmış fatura numarası
+            'name': number,                             # Atanmış fatura numarası
             # UUID: GİB'te faturaları tanımlayan benzersiz kimlik (UUID v4 formatı)
-            'x_sovos_uuid': 'test-uuid-1234-5678-abcd-ef0123456789',
+            'x_sovos_uuid': '1a2b3c4d-1234-4678-abcd-%s' % suffix,
             # Envelope UUID: Sovos'un zarfı için UUID (birden fazla fatura bir zarfta gelebilir)
-            'x_sovos_envelope_uuid': 'env-uuid-1234-5678-abcd-ef0123456789',
+            'x_sovos_envelope_uuid': '5e6f7a8b-1234-4678-abcd-%s' % suffix,
             # Partner'ın e-fatura tipi (efatura veya earsiv)
             'x_efatura_type': partner.x_efatura_type if partner else 'efatura',
             'x_efatura_scenario': scenario,             # TICARIFATURA, TEMELFATURA, EARSIVFATURA
@@ -284,7 +293,7 @@ class SovosTestCommon(TransactionCase):
             'x_efatura_send_date': '2026-06-01 10:00:00',
             # Numara onaylandı (Sovos başarı döndürdü)
             'x_number_status': 'confirmed',
-            'x_reserved_number': 'TST2026000000001',
+            'x_reserved_number': number,
         })
 
         # TICARIFATURA'larda ticari kabul/red süreci var

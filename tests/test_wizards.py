@@ -165,12 +165,8 @@ class TestCancelWizard(SovosTestCommon):
             'gib_portal_confirmed': True,    # onay VAR
         })
 
-        with patch(
-            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
-            '.SovosInvoiceService.cancel_invoice',
-            return_value=True,
-        ):
-            wizard.action_cancel()
+        # e-Fatura iptali Sovos API'si çağırmaz (GİB portalında yapılır, burada işaretlenir)
+        wizard.action_cancel()
 
         self.assertEqual(inv.x_efatura_status, 'cancelled')
 
@@ -230,12 +226,8 @@ class TestCancelWizard(SovosTestCommon):
             'gib_portal_confirmed': True,
         })
 
-        with patch(
-            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
-            '.SovosInvoiceService.cancel_invoice',
-            return_value=True,
-        ):
-            wizard.action_cancel()
+        # e-Fatura iptali Sovos API'si çağırmaz (GİB portalında yapılır, burada işaretlenir)
+        wizard.action_cancel()
 
         self.assertEqual(inv.x_efatura_status, 'cancelled')
 
@@ -262,13 +254,9 @@ class TestCancelWizard(SovosTestCommon):
             'gib_portal_confirmed': True,
         })
 
-        with patch(
-            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
-            '.SovosInvoiceService.cancel_invoice',
-            return_value=True,
-        ):
-            # Exception fırlatılmamalı
-            wizard.action_cancel()
+        # e-Fatura iptali Sovos API'si çağırmaz (GİB portalında yapılır, burada işaretlenir)
+        # Exception fırlatılmamalı
+        wizard.action_cancel()
 
         self.assertEqual(inv.x_efatura_status, 'cancelled')
 

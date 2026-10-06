@@ -727,9 +727,9 @@ class AccountMove(models.Model):
         elif code in GIB_CANCEL_AND_NEW:
             # 1104, 1163 — İçerik hatası; iptal + yeni fatura gerekli
             self._set_error(user_msg)
-            if code == 1104:
-                # 1104: atomik numara mekanizmasına rağmen başka kanaldan numara çakışması
-                self._notify_admin_gib_error(code, user_msg)
+            # 1104: atomik numaraya rağmen başka kanaldan numara çakışması
+            # 1163: mükerrer UUID — UUID üretiminde sorun; ikisi de manuel inceleme ister
+            self._notify_admin_gib_error(code, user_msg)
 
         elif code in GIB_SOVOS_SUPPORT:
             # 1161, 1171, 1172 — İmza / yetki; Sovos teknik destek

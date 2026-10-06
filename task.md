@@ -3,7 +3,8 @@
 ## 🔜 Sıradaki
 
 - [ ] Sunucuyu repodan güncelle (önce `odoo18-test`, sonra prod; `services/schemas/` korunmalı) ve sunucu kopyasını git ile yönetilir hale getir — kullanıcı onayıyla
-- [ ] Test DB'de `--test-tags /l10n_tr_sovos_efatura` çalıştırıp sonucu kaydet
+- [ ] Test DB'de `--test-tags /l10n_tr_sovos_efatura` çalıştırıp sonucu kaydet (18.0.8.0.4 ile 7. çalıştırma)
+- [ ] Atomik numara: hata yolunda `released`/hata mesajı rollback'te kayboluyor — kullanıcı kararı (ayrı cursor ile kayıt mı, bildirim döndürmek mi?)
 - [ ] v8 yeni özellikleri için test yaz: `ubl_parser`, `incoming_matcher`, `efatura.product.mapping`, gelen fatura eşleme sihirbazı (şu an testi yok)
 - [ ] `l10n_tr_sovos_efatura.bak_20260628` yedeğinin gerekliliğini kullanıcıyla değerlendir
 

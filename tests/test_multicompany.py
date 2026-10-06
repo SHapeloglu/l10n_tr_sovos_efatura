@@ -62,6 +62,12 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         })
         self.company2.x_invoice_sequence_id = seq2
 
+        # Şirket 2'ye hesap planı yükle (dergi/hesap yoksa fatura oluşturulamaz)
+        self.env.user.company_ids |= self.company2
+        self.env['account.chart.template'].try_loading(
+            self.company.chart_template or 'generic_coa',
+            company=self.company2, install_demo=False)
+
     # ── InvoiceService Credentials İzolasyonu ───────────────────────────
 
     def test_invoice_service_uses_company1_credentials(self):
@@ -256,25 +262,22 @@ class TestMultiCompanyCredentials(SovosTestCommon):
         with_company() kullanımı izolasyonu sağlamalı.
         Spec §13.1: 'with_company() — şirket A credentials'ı B'ye geçemez'
         """
-        processed_companies = []
+        processed = []
 
-        def fake_task(company):
-            processed_companies.append(company.id)
+        def fake_task(self_sync, company):
+            processed.append((company.id, self_sync.env.company.id))
 
         sync = self.env['sovos.sync']
-        with patch.object(type(sync), '_notify_admin'):
-            sync._cron_run_for_all_companies('cron_sync_incoming_invoices',
-                                             task_fn=fake_task
-                                             if hasattr(sync._cron_run_for_all_companies,
-                                                        '__code__') else None)
+        with patch.object(type(sync), '_sync_incoming_for_company', fake_task), \
+             patch.object(type(sync), '_notify_admin'):
+            sync._cron_run_for_all_companies('_sync_incoming_for_company')
 
-        # Her şirket için ayrı çalışma doğrulanamıyorsa cron şirket döngüsünü kontrol et
-        # (metodun imzasına göre farklı yaklaşım kullanılabilir)
-        companies_with_credentials = self.env['res.company'].search([
-            ('x_sovos_invoice_user', '!=', False)
-        ])
-        self.assertGreaterEqual(len(companies_with_credentials), 1,
-            'En az 1 credentials\'lı şirket olmalı')
+        processed_ids = [c for c, _ in processed]
+        self.assertIn(self.company.id, processed_ids)
+        self.assertIn(self.company2.id, processed_ids)
+        for company_id, env_company_id in processed:
+            self.assertEqual(company_id, env_company_id,
+                'Görev ilgili şirketin context\'inde (with_company) çalışmalı')
 
     def test_company_a_failure_does_not_expose_company_b_credentials(self):
         """

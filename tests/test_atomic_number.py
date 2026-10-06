@@ -391,6 +391,13 @@ class TestAtomicNumber(SovosTestCommon):
                 ('type', '=', 'general'),
                 ('company_id', '=', self.company.id),
             ], limit=1).id,
+            # Odoo 18: satırsız fiş post edilemez → dengeli borç/alacak satırları
+            'line_ids': [
+                (0, 0, {'name': 'Borç', 'account_id': self.account_income.id,
+                        'debit': 100.0, 'credit': 0.0}),
+                (0, 0, {'name': 'Alacak', 'account_id': self.account_income.id,
+                        'debit': 0.0, 'credit': 100.0}),
+            ],
         })
         combo = efatura_inv | misc_move
 

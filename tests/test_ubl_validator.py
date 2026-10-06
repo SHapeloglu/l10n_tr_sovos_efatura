@@ -300,7 +300,7 @@ class TestUblValidator(SovosTestCommon):
         doc = etree.fromstring(xml)
         errors = UblValidator()._check_gib_rules(doc)
 
-        id_errors = [e for e in errors if 'ID' in e and 'format' in e.lower()]
+        id_errors = [e for e in errors if 'cbc:ID' in e]
         self.assertTrue(id_errors, 'Hatalı ID formatı yakalanmalı')
 
     def test_gib_rules_future_date_rejected(self):
