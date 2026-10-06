@@ -27,6 +27,16 @@ sunucu conf sıkılaştırması (db_name/dbfilter/list_db, http_interface 127.0.
   → **Hiçbir ortamda gerçek iş verisi yok; e-Fatura canlıda değil.** odoo18-test geliştirme ortamı — güncelleme güvenli.
   Canlıya geçiş ileride: `olap_prod`'a uygulamalar + özel modüller kurulacak (kullanıcı onayıyla).
 
+**2026-10-06 — Gelen fatura hataları (18.0.8.0.6):**
+- Cron: `get_inbound_list()` tarihsiz çağrılıyordu (her çalışmada TypeError). Artık kaldığı günden bugüne gün gün
+  (`get_inbound_list(day, day)`); ilerleme `ir.config_parameter` `l10n_tr_sovos_efatura.incoming_last_date.<şirket>`;
+  son gün yeniden sorgulanır (mükerrer UUID atlanır); ilk çalışma 7 gün geriye; bir çalışmada ≤31 gün; sorgu hatası
+  yukarı fırlar (admin bildirimi), işlenen günler korunur; her fatura savepoint içinde. Şema değişikliği yok.
+- Sihirbaz: `default_get` faturanın ürün satırlarından `line_ids` üretir (senkron notu ayıklanır, ürün yoksa
+  IncomingMatcher önerisi). Pasif döviz `active_test=False` ile bulunur; pasif/bilinmeyen → 'pending' + açıklama notu.
+- Testler: TestIncomingSyncDays (6), döviz (2), sihirbaz (3); `get_inbound_list` yamaları `autospec=True`.
+- `sovos_ci_test` (48 MB): her test çalıştırmasında silinip yeniden kuruluyor; içinde veri yok, silmek kayıpsız.
+
 ---
 
 ## 2026-10-05

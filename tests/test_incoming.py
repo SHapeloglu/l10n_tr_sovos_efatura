@@ -20,14 +20,18 @@ Sovos çağrıları mock'lanır; UBL örnekleri bu dosyada üretilir (gerçek VK
 """
 import os
 import tempfile
-from datetime import date
+from datetime import date, timedelta
 from unittest.mock import patch
 
 from psycopg2 import IntegrityError
 
+from odoo import fields
 from odoo.tools import mute_logger
 
 from odoo.addons.l10n_tr_sovos_efatura.services.incoming_matcher import IncomingMatcher
+from odoo.addons.l10n_tr_sovos_efatura.models.sovos_sync import (
+    INCOMING_INITIAL_DAYS, INCOMING_MAX_DAYS_PER_RUN, INCOMING_PARAM_KEY,
+)
 from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 from odoo.addons.l10n_tr_sovos_efatura.services.ubl_parser import UblParser
 
@@ -433,7 +437,8 @@ class TestIncomingSync(IncomingTestCommon):
               sender_vkn=SUPPLIER_VKN, ubl_error=None):
         header = [{'uuid': uuid, 'sender_vkn': sender_vkn, 'invoice_date': '2026-09-14'}]
         ubl_kw = {'side_effect': ubl_error} if ubl_error else {'return_value': xml}
-        with patch.object(SovosInvoiceService, 'get_inbound_list', return_value=header), \
+        # autospec: get_inbound_list(date_from, date_to) imzası testte de denetlenir
+        with patch.object(SovosInvoiceService, 'get_inbound_list', autospec=True, return_value=header), \
                 patch.object(SovosInvoiceService, 'get_invoice_ubl', **ubl_kw):
             self.env['sovos.sync']._sync_incoming_for_company(self.company)
         return self.env['account.move'].search([
@@ -509,6 +514,21 @@ class TestIncomingSync(IncomingTestCommon):
         move = self._sync(_ubl_invoice([_ubl_line(1, 'Ofis Sandalyesi Mavi', code='OS-12')], currency='EUR'))
         self.assertEqual(move.currency_id, eur)
 
+    def test_inactive_currency_is_used_and_flagged(self):
+        """Pasif döviz de bulunur (eskiden TRY'ye düşüyordu); fatura kontrol için bekletilir."""
+        eur = self.env.ref('base.EUR')
+        eur.active = False
+        move = self._sync(_ubl_invoice([_ubl_line(1, 'Ofis Sandalyesi Mavi', code='OS-12')], currency='EUR'))
+        self.assertEqual(move.currency_id, eur)
+        self.assertEqual(move.x_efatura_match_status, 'pending')
+        self.assertIn('pasif', str(move.narration))
+
+    def test_unknown_currency_falls_back_and_is_flagged(self):
+        move = self._sync(_ubl_invoice([_ubl_line(1, 'Ofis Sandalyesi Mavi', code='OS-12')], currency='XYZ'))
+        self.assertEqual(move.currency_id, self.company.currency_id)
+        self.assertEqual(move.x_efatura_match_status, 'pending')
+        self.assertIn('XYZ', str(move.narration))
+
     def test_ubl_fetch_failure_falls_back_to_header(self):
         """GetUBL başarısız → fatura başlık bilgisiyle, satırsız oluşur; inceleme bekler."""
         move = self._sync(ubl_error=Exception('Sovos zaman aşımı'))
@@ -523,6 +543,81 @@ class TestIncomingSync(IncomingTestCommon):
         self.assertEqual(len(move), 1)
         self.assertFalse(move.invoice_line_ids)
         self.assertEqual(move.x_efatura_match_status, 'review')
+
+
+class TestIncomingSyncDays(IncomingTestCommon):
+    """GetUblList en fazla 1 gün sorgular: kaldığı günden bugüne gün gün, ilerleme kaydedilir."""
+
+    def setUp(self):
+        super().setUp()
+        self.sync = self.env['sovos.sync']
+        self.ICP = self.env['ir.config_parameter'].sudo()
+        self.key = INCOMING_PARAM_KEY % self.company.id
+        self.today = fields.Date.context_today(self.sync)
+
+    def _run(self, last=None, side_effect=None):
+        self.ICP.set_param(self.key, fields.Date.to_string(last) if last else False)
+        kw = {'side_effect': side_effect} if side_effect else {'return_value': []}
+        with patch.object(SovosInvoiceService, 'get_inbound_list', autospec=True, **kw) as mock:
+            self.sync._sync_incoming_for_company(self.company)
+        return mock
+
+    @staticmethod
+    def _days(mock):
+        # autospec → args = (svc, date_from, date_to); her çağrı tek gün olmalı
+        for c in mock.call_args_list:
+            assert c.args[1] == c.args[2], c
+        return [c.args[1] for c in mock.call_args_list]
+
+    def _last(self):
+        return fields.Date.to_date(self.ICP.get_param(self.key))
+
+    def test_first_run_queries_initial_window_day_by_day(self):
+        mock = self._run()
+        start = self.today - timedelta(days=INCOMING_INITIAL_DAYS)
+        self.assertEqual(self._days(mock), [start + timedelta(days=i) for i in range(INCOMING_INITIAL_DAYS + 1)])
+        self.assertEqual(self._last(), self.today)
+
+    def test_resumes_from_last_processed_day(self):
+        mock = self._run(last=self.today - timedelta(days=2))
+        self.assertEqual(self._days(mock), [self.today - timedelta(days=2),
+                                            self.today - timedelta(days=1), self.today])
+        self.assertEqual(self._last(), self.today)
+
+    def test_same_day_rerun_queries_today_again(self):
+        mock = self._run(last=self.today)
+        self.assertEqual(self._days(mock), [self.today])
+
+    def test_long_gap_is_processed_in_chunks(self):
+        last = self.today - timedelta(days=100)
+        mock = self._run(last=last)
+        self.assertEqual(len(mock.call_args_list), INCOMING_MAX_DAYS_PER_RUN)
+        self.assertEqual(self._last(), last + timedelta(days=INCOMING_MAX_DAYS_PER_RUN - 1))
+
+    def test_query_failure_keeps_progress_and_raises(self):
+        fail_day = self.today - timedelta(days=1)
+
+        def fake(svc, date_from, date_to):
+            if date_from == fail_day:
+                raise Exception('Sovos erişilemedi')
+            return []
+
+        # assertRaises kullanılmıyor: savepoint geri alması kaydedilen ilerlemeyi de silerdi
+        raised = False
+        try:
+            self._run(last=self.today - timedelta(days=3), side_effect=fake)
+        except Exception:
+            raised = True
+        self.assertTrue(raised, 'Sorgu hatası cron\'a iletilmeli (admin bildirimi için)')
+        self.assertEqual(self._last(), fail_day - timedelta(days=1))
+
+    def test_invoice_seen_on_several_days_created_once(self):
+        header = [{'uuid': '99999999-2222-3333-4444-555555555555', 'sender_vkn': SUPPLIER_VKN,
+                   'invoice_date': '2026-09-14'}]
+        with patch.object(SovosInvoiceService, 'get_invoice_ubl', return_value=None):
+            self._run(last=self.today - timedelta(days=2), side_effect=lambda svc, a, b: header)
+        self.assertEqual(self.env['account.move'].search_count(
+            [('x_sovos_uuid', '=', header[0]['uuid'])]), 1)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -574,6 +669,53 @@ class TestIncomingMatchWizard(IncomingTestCommon):
         ).default_get(['invoice_id', 'partner_id'])
         self.assertEqual(defaults['invoice_id'], self.invoice.id)
         self.assertEqual(defaults['partner_id'], self.supplier.id)
+
+    def test_default_get_builds_lines_with_matcher_suggestion(self):
+        """Satırsız açılma hatası: sihirbaz faturanın satırlarından, öneriyle dolu satır üretmeli."""
+        self.invoice.partner_id = self.supplier
+        self.env['efatura.product.mapping'].create({
+            'supplier_id': self.supplier.id,
+            'efatura_description': 'Masa Lambası LED',
+            'product_id': self.product.id,
+        })
+        defaults = self.env['sovos.incoming.match.wizard'].with_context(
+            active_id=self.invoice.id,
+        ).default_get(['invoice_id', 'partner_id', 'line_ids'])
+        self.assertEqual(len(defaults['line_ids']), 1)
+        vals = defaults['line_ids'][0][2]
+        self.assertEqual(vals['move_line_id'], self.move_line.id)
+        self.assertEqual(vals['efatura_description'], 'Masa Lambası LED')
+        self.assertEqual((vals['efatura_quantity'], vals['efatura_unit_price']), (3, 100.0))
+        self.assertEqual(vals['product_id'], self.product.id)
+        self.assertEqual((vals['match_source'], vals['confidence']), ('learned_mapping', 100.0))
+        self.assertEqual(vals['account_id'], self.account_expense.id)
+
+    def test_default_get_keeps_line_product_and_strips_sync_note(self):
+        self.move_line.write({
+            'name': 'Ofis Sandalyesi\n[e-Fatura: Ofis Sandalyesi | Eşleme: difflib_suggest (70%)]',
+            'product_id': self.chair.id,
+        })
+        vals = self.env['sovos.incoming.match.wizard'].with_context(
+            active_id=self.invoice.id,
+        ).default_get(['line_ids'])['line_ids'][0][2]
+        self.assertEqual(vals['efatura_description'], 'Ofis Sandalyesi')
+        self.assertEqual((vals['product_id'], vals['match_source']), (self.chair.id, 'invoice'))
+
+    def test_wizard_opened_from_invoice_confirms_end_to_end(self):
+        """Arayüz akışı: faturadan açılan sihirbaz satırlarla gelir, onay ürünü yazar ve öğrenir."""
+        self.invoice.partner_id = self.supplier
+        self.env['efatura.product.mapping'].create({
+            'supplier_id': self.supplier.id,
+            'efatura_description': 'Masa Lambası LED',
+            'product_id': self.product.id,
+        })
+        wizard = self.env['sovos.incoming.match.wizard'].with_context(
+            default_invoice_id=self.invoice.id,
+        ).create({'partner_id': self.supplier.id})
+        self.assertEqual(len(wizard.line_ids), 1)
+        wizard.action_confirm()
+        self.assertEqual(self.move_line.product_id, self.product)
+        self.assertEqual(self.invoice.x_efatura_match_status, 'matched')
 
     def test_confirm_applies_partner_lines_and_learns(self):
         result = self._wizard().action_confirm()

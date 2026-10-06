@@ -82,7 +82,13 @@ class TestCronSync(SovosTestCommon):
         with patch(
             'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_inbound_list',
+            autospec=True,   # get_inbound_list(date_from, date_to) imzası denetlensin
             return_value=mock_invoices,
+        ), patch(
+            # UBL çekme yamalanmazsa gerçek SOAP isteği denenir (test çatısı engeller)
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            '.SovosInvoiceService.get_invoice_ubl',
+            return_value=None,
         ):
             sync._sync_incoming_for_company(self.company)
 
@@ -115,7 +121,13 @@ class TestCronSync(SovosTestCommon):
         with patch(
             'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_inbound_list',
+            autospec=True,   # get_inbound_list(date_from, date_to) imzası denetlensin
             return_value=mock_invoices,
+        ), patch(
+            # UBL çekme yamalanmazsa gerçek SOAP isteği denenir (test çatısı engeller)
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            '.SovosInvoiceService.get_invoice_ubl',
+            return_value=None,
         ):
             sync._sync_incoming_for_company(self.company)
 
@@ -156,7 +168,13 @@ class TestCronSync(SovosTestCommon):
         with patch(
             'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_inbound_list',
+            autospec=True,   # get_inbound_list(date_from, date_to) imzası denetlensin
             return_value=mock_invoices,
+        ), patch(
+            # UBL çekme yamalanmazsa gerçek SOAP isteği denenir (test çatısı engeller)
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            '.SovosInvoiceService.get_invoice_ubl',
+            return_value=None,
         ):
             sync._sync_incoming_for_company(self.company)
 

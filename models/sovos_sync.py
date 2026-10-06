@@ -20,6 +20,14 @@ from odoo import models, api, fields, _
 
 _logger = logging.getLogger(__name__)
 
+# Gelen fatura senkronu: GetUblList tek çağrıda en fazla 1 günlük aralık kabul eder (SSS S3/S10).
+# Kaldığı gün şirket bazında ir.config_parameter'da tutulur; ilk çalışmada geriye bakılan gün sayısı
+# ve bir cron çalışmasında işlenecek en fazla gün (uzun kesintide zaman aşımını önler, kalan
+# günler sonraki çalışmalarda işlenir).
+INCOMING_PARAM_KEY = 'l10n_tr_sovos_efatura.incoming_last_date.%s'
+INCOMING_INITIAL_DAYS = 7
+INCOMING_MAX_DAYS_PER_RUN = 31
+
 
 class SovosSync(models.Model):
     _name = 'sovos.sync'
@@ -101,28 +109,42 @@ class SovosSync(models.Model):
 
         AccountMove = self.env['account.move'].with_company(company)
 
-        # 1. Gelen fatura listesi
-        invoice_list = svc.get_inbound_list()
+        # 1. Gelen fatura listesi — kaldığı günden bugüne, gün gün (GetUblList ≤ 1 gün)
+        ICP = self.env['ir.config_parameter'].sudo()
+        param_key = INCOMING_PARAM_KEY % company.id
+        today = fields.Date.context_today(self)
+        last = fields.Date.to_date(ICP.get_param(param_key) or False)
+        # Son işlenen gün yeniden sorgulanır: o gün sonradan gelen faturalar kaçmasın
+        # (mükerrerler aşağıdaki UUID kontrolüyle atlanır).
+        day = min(last, today) if last else today - timedelta(days=INCOMING_INITIAL_DAYS)
+        end = min(today, day + timedelta(days=INCOMING_MAX_DAYS_PER_RUN - 1))
 
-        for inv_header in invoice_list:
-            uuid = inv_header.get('uuid')
-            if not uuid:
-                continue
+        while day <= end:
+            # Sorgu hatası yukarı fırlar (cron admin'e bildirir); işlenen günler kaydedilmiş kalır
+            invoice_list = svc.get_inbound_list(day, day)
+            for inv_header in invoice_list:
+                uuid = inv_header.get('uuid')
+                if not uuid:
+                    continue
 
-            # 2. Duplikasyon kontrolü
-            if AccountMove.search([
-                ('x_sovos_uuid', '=', uuid),
-                ('move_type', '=', 'in_invoice'),
-            ], limit=1):
-                continue  # Zaten var
+                # 2. Duplikasyon kontrolü
+                if AccountMove.search([
+                    ('x_sovos_uuid', '=', uuid),
+                    ('move_type', '=', 'in_invoice'),
+                ], limit=1):
+                    continue  # Zaten var
 
-            try:
-                self._process_single_incoming(
-                    uuid, inv_header, company, svc, parser, matcher, AccountMove
-                )
-            except Exception as e:
-                _logger.error('Gelen fatura işlenemedi (UUID=%s): %s', uuid, e)
-                continue  # Diğer faturalar etkilenmesin
+                try:
+                    # savepoint: yarım kalan fatura/satır kaydı diğerlerini bozmasın
+                    with self.env.cr.savepoint():
+                        self._process_single_incoming(
+                            uuid, inv_header, company, svc, parser, matcher, AccountMove
+                        )
+                except Exception as e:
+                    _logger.error('Gelen fatura işlenemedi (UUID=%s): %s', uuid, e)
+                    continue  # Diğer faturalar etkilenmesin
+            ICP.set_param(param_key, fields.Date.to_string(day))
+            day += timedelta(days=1)
 
     def _process_single_incoming(self, uuid, inv_header, company, svc, parser, matcher, AccountMove):
         """Tek bir gelen faturayı işle."""
@@ -174,6 +196,22 @@ class SovosSync(models.Model):
         # Notları müşteri notuna ekle
         if parsed and parsed.get('notes'):
             move_vals['narration'] = '\n'.join(parsed['notes'])
+
+        # Pasif / bilinmeyen para birimi: fatura yine o dövizle (ya da bulunamazsa
+        # şirket para birimiyle) oluşur ama kullanıcı kontrolü için bekletmeye alınır.
+        currency = self.env['res.currency'].browse(move_vals['currency_id'])
+        currency_code = (parsed or {}).get('currency')
+        currency_note = False
+        if parsed and currency_code and currency.name != currency_code:
+            currency_note = _('UBL para birimi %s Odoo\'da bulunamadı; %s kullanıldı — kontrol edin.') % (
+                currency_code, currency.name)
+        elif not currency.active:
+            currency_note = _('Para birimi %s Odoo\'da pasif — Muhasebe > Ayarlar > Para Birimleri\'nden '
+                              'etkinleştirip faturayı kontrol edin.') % currency.name
+        if currency_note:
+            move_vals['x_efatura_match_status'] = match_status = 'pending'
+            move_vals['narration'] = '\n'.join(filter(None, [move_vals.get('narration'), currency_note]))
+            _logger.warning('Gelen fatura UUID=%s: %s', uuid, currency_note)
 
         move = AccountMove.create(move_vals)
 
@@ -263,7 +301,9 @@ class SovosSync(models.Model):
         if not parsed:
             return company.currency_id.id
         currency_code = parsed.get('currency', 'TRY')
-        currency = self.env['res.currency'].search(
+        # Pasif para birimleri de aranır: varsayılan arama pasifleri atlar ve dövizli
+        # fatura sessizce şirket para birimiyle (TRY) kaydedilirdi.
+        currency = self.env['res.currency'].with_context(active_test=False).search(
             [('name', '=', currency_code)], limit=1
         )
         return currency.id if currency else company.currency_id.id

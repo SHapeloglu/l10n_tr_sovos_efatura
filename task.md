@@ -19,11 +19,9 @@
 - [ ] **Canlıya geçiş planı (ileride):** `olap_prod` boş — Muhasebe/Satış/Stok vb. + özel modüller (`l10n_tr_sovos_efatura`, `nakliye_yonetim`, `mail_gateway*`, `wa_erp_bot`) kurulacak; şirket + Sovos ayarları, test modu açık başla; önce DB yedeği (kullanıcı onayıyla)
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
 - [ ] (İsteğe bağlı) Hata yolunda doğrulama XML eki / `x_validation_errors` rollback'te kayboluyor; kalıcı olması istenirse hata sonrası ayrı bir 'hata raporu' adımı tasarla (ayrı cursor kilitlenme riski nedeniyle reddedildi)
-- [ ] **HATA — gelen fatura cron'u çalışmıyor:** `sovos_sync._sync_incoming_for_company` → `svc.get_inbound_list()` parametresiz; imza `get_inbound_list(date_from, date_to)` → her çalışmada `TypeError` + admin bildirimi. Son senkron tarihinden bugüne gün gün döngü kur (GetUblList ≤ 1 gün); `test_cron` ve `test_incoming`'deki `get_inbound_list` yamalarını `autospec=True` yap ki imza hatası testte yakalansın
-- [ ] **HATA — eşleme sihirbazı satırsız açılıyor:** `incoming_invoice_match_wizard.default_get` `line_ids` üretmiyor → arayüzden ürün eşleme ve öğrenen tabloya kayıt yapılamıyor. Faturanın satırlarından wizard satırı üret, `IncomingMatcher.find_product` önerisiyle ön doldur; `test_incoming.TestIncomingMatchWizard`'a default_get satır testi ekle
-- [ ] **HATA — pasif döviz:** `sovos_sync._find_currency` pasif para birimini bulamıyor → dövizli fatura TRY olarak kaydediliyor. `active_test=False` ile ara; pasifse 'pending' + not
 - [ ] (Küçük) `efatura.product.mapping.find_mapping` `=ilike` kullanıyor: açıklamadaki `%`/`_` joker gibi davranır, Türkçe `ı/I`–`i/İ` harf eşlemesi yapılmaz. Joker karakterleri kaçışla veya Python'da `casefold` karşılaştırması yap
-- [ ] (Küçük) `test_cron`'daki gelen fatura testleri `get_invoice_ubl`'ı yamalamıyor → gerçek SOAP isteği deneniyor (Odoo test çatısı engelliyor, log'da "External requests verboten")
+- [ ] 18.0.8.0.6'yı `sovos_ci_test`'te test et → `odoo18-test`'e yükle (`-u`)
+- [ ] (Küçük) Sihirbaz açılışında öğrenen tablo önerisi `increment_usage()` çağırıyor → kullanım sayacı her açılışta artar; öneri için sayaçsız arama ekle
 - [ ] `l10n_tr_sovos_efatura.bak_20260628` yedeğinin gerekliliğini kullanıcıyla değerlendir
 
 ## 🚧 Devam Eden
@@ -31,6 +29,7 @@
 _(şu anda boş)_
 
 ## ✅ Tamamlanan
+- [x] 18.0.8.0.6 — gelen fatura hataları: cron gün gün sorgu (kaldığı gün `ir.config_parameter`, ilk çalışma 7 gün, çalışma başına ≤31 gün, fatura başına savepoint); eşleme sihirbazı satırları faturadan + öneriyle doluyor; pasif döviz bulunuyor, pasif/bilinmeyen döviz 'pending' + not; test yamaları `autospec=True`, test_cron `get_invoice_ubl` yamalı (2026-10-06, test sunucuda çalıştırılacak)
 - [x] Ortam envanteri: hiçbir DB'de gerçek veri yok (odoo18-test 0 fatura); `olap_prod` boş; projeler odoo18-test'te (2026-10-06)
 - [x] Gelen fatura testleri: `tests/test_incoming.py` — UBL parser (XXE dahil), eşleme motoru (VKN / unvan benzerliği / öğrenen tablo / UBL kodu / kural + difflib eşikleri), vergi-birim-gider hesabı, öğrenen tablo kısıtları, uçtan uca senkron (matched_auto / review / pending, döviz, UBL hatası), eşleme sihirbazı; `sovos_ci_test`'te 288 testin tamamı geçti (2026-10-06)
 - [x] PR #1 (v8 + güvenlik + Odoo 18 uyumu, 18.0.8.0.5) `main`'e birleştirildi (2026-10-06)
