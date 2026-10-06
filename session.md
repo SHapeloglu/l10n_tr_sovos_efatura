@@ -103,6 +103,10 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     nginx üzerinden prod/test `/web/login` 200.
   - **Modül dışı bulgu:** `odoo18-prod/test.olap.com.tr` Let's Encrypt sertifikalarının süresi 2026-09-23'te dolmuş;
     certbot.timer çalışıyor ama 7 yenileme başarısız; alan adları sunucudan DNS'te çözülmüyor (yenileme bu yüzden başarısız olabilir).
+  - DNS teşhisi: ana alan adları aktif ama bölgelerde bu sunucuya (95.111.242.96) giden alt alan adı A kayıtları yok —
+    olap.com.tr (mirahosting, SOA 2026-07-23): odoo18-prod/odoo18-test/odoo-test; dehateknikservis.com (Wix, 2026-09-02):
+    api/fretflow; powerbiegitimi.com (webdehasi, 2026-08-31): erpopenpy/nexmeet. Çözüm DNS panellerinde (sunucudan yapılamaz);
+    kayıtlar eklenince `certbot renew && systemctl reload nginx`.
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## 🔜 Sıradaki
 
-- [ ] **Sunucu (modül dışı):** `odoo18-prod/test.olap.com.tr` SSL sertifikaları 2026-09-23'ten beri süresi dolmuş; DNS çözülmüyor, certbot 7 yenileme hatası
+- [ ] **Sunucu (modül dışı, kullanıcı DNS panelinde):** A kayıtlarını 95.111.242.96'ya ekle — olap.com.tr: odoo18-prod, odoo18-test; dehateknikservis.com (Wix): api, fretflow; powerbiegitimi.com: erpopenpy, nexmeet → sonra `certbot renew`; kullanılmayanların sertifikasını sil
 - [ ] **Güvenlik (sunucu, modül dışı):** Ollama 11434 (auth yok, herkese açık), VNC 5901, Docker 8090 (ufw'yi atlar), 8080 — kullanıcı kim/nereden kullanıldığını bildirecek
 - [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
 
