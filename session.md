@@ -2,6 +2,21 @@
 
 ---
 
+## 📍 Kaldığımız yer — 2026-10-06 sonu
+
+**Biten:** v8 repoya alındı → 18.0.8.0.5 (güvenlik + Odoo 18 uyumu + test düzeltmeleri); 229 test geçti; sunucu klasörü
+güncellendi (yedek `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.0_20261006_025643`); prod/test yeniden başlatıldı;
+sunucu conf sıkılaştırması (db_name/dbfilter/list_db, http_interface 127.0.0.1, proxy_mode, admin_passwd), PostgreSQL ufw + hostssl.
+
+**Açık:**
+1. DNS A kayıtları + SSL yenileme (kullanıcı panellerde yapacak) — ayrıntı `task.md`.
+2. Ollama/VNC/Docker 8090/8080 kullanımı — kullanıcı bilgisi bekleniyor.
+3. Gelen fatura testleri; sunucu kopyasını git ile yönetme; `bak_20260628` kararı; PR merge.
+
+**Not:** `/root/odoo_admin_passwd_20261006_032503.txt` kullanıcı kaydedip silecek.
+
+---
+
 ## 2026-10-05
 
 **Yapılanlar:**
