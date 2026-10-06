@@ -77,6 +77,7 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
   `odoo18-test` DB `-u` → `installed|18.0.8.0.5`, iki servis active. Log'daki tek ERROR
   ("Importing test framework…") bu modülden değil, custom_addons'taki başka bir modülden.
   Prod: workers=4 → işçiler yenilendikçe yeni Python kodu devreye girer; prod DB'de `-u` gerekmiyor.
+  - `odoo18-prod` kullanıcı tarafından yeniden başlatıldı → active; journalctl'de ERROR/CRITICAL yok (logfile ayrıca kontrol edilecek).
 
 ---
 
