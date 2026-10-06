@@ -2,7 +2,8 @@
 
 ## 🔜 Sıradaki
 
-- [ ] **Güvenlik (sunucu, modül dışı):** Odoo portlarını (8074-8077) 127.0.0.1'e bağla + nginx HTTPS; `admin_passwd` gücünü kontrol et — kullanıcı onayıyla
+- [ ] **Güvenlik (sunucu, modül dışı):** Odoo conf'a `http_interface = 127.0.0.1` + `proxy_mode = True`; `admin_passwd` (14 kr.) yenile — komutlar hazır, kullanıcı uygulayacak
+- [ ] **Güvenlik (sunucu, modül dışı):** Ollama 11434 (auth yok, herkese açık), VNC 5901, Docker 8090 (ufw'yi atlar), 8080 — kullanıcı kim/nereden kullanıldığını bildirecek
 - [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
 
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
@@ -15,6 +16,7 @@
 _(şu anda boş)_
 
 ## ✅ Tamamlanan
+- [x] PostgreSQL 5432 ufw kuralı 4 IP'ye daraltıldı; pg_hba `host` → `hostssl` (2026-10-06)
 - [x] prod/test conf: `db_name` + anchor'lı `dbfilter` + `list_db = False` — servisler arası çapraz cron çalışması ve DB yöneticisi kapatıldı (2026-10-06)
 - [x] `odoo18-prod` 18.0.8.0.5 koduyla yeniden başlatıldı, hata yok (2026-10-06)
 - [x] Sunucu klasörü 18.0.8.0.5'e güncellendi, `odoo18-test` DB `-u` başarılı (2026-10-06)

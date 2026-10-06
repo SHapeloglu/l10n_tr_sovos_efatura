@@ -92,6 +92,11 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     test → `db_name = odoo18-test`, `dbfilter = ^odoo18-test$`, `list_db = False`. İki servis yeniden başlatıldı, active;
     prod login 200, `/web/database/manager` "disabled by the administrator".
   - Kalan: Odoo portlarını 127.0.0.1'e bağla + nginx HTTPS; `admin_passwd` gücünü kontrol et; `sovos_ci_test` DB'sini sil; `isg` DB eksik modüller.
+  - Sunucu ağ incelemesi: ufw varsayılan deny → Odoo portları (8074-8077) dışarıdan kapalı; nginx upstream'leri
+    127.0.0.1:8076/8074. **Uygulandı:** 5432 ufw kuralı "Anywhere" yerine pg_hba'daki 4 IP'ye daraltıldı;
+    `152.55.176.240` satırı `host` → `hostssl` (yedek `/root/pg_hba.conf.bak_20261006`).
+    Bekleyen (kullanıcı kararı): Ollama 11434 kimlik doğrulamasız açık, VNC 5901 açık, Docker 8090 ufw'yi atlıyor,
+    8080 (python3) bilinmiyor, 1433'te dinleyen yok; Odoo `http_interface = 127.0.0.1` + `proxy_mode = True` + yeni `admin_passwd` (14 kr.).
 
 ---
 
