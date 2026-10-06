@@ -15,6 +15,15 @@ sunucu conf sıkılaştırması (db_name/dbfilter/list_db, http_interface 127.0.
 
 **Not:** `/root/odoo_admin_passwd_20261006_032503.txt` kullanıcı kaydedip silecek.
 
+**2026-10-06 — Sunucudaki projeler/DB envanteri (kullanıcı çıktısı):**
+- `olap_prod` (odoo18-prod): yalnızca 12 çekirdek modül, uygulama yok, özel modül kurulu değil → **prod fiilen kullanılmıyor**.
+- `odoo18-test` (odoo18-test): 75 modül — account, sale_management, stock, fleet, hr, hr_skills, maintenance, mail + özel:
+  `l10n_tr_sovos_efatura` 18.0.8.0.5, `nakliye_yonetim` 18.0.1.0, `mail_gateway` 18.0.1.0.9, `mail_gateway_whatsapp` 18.0.2.1.5, `wa_erp_bot` 18.0.1.0.0.
+  Asıl dolu ortam bu; gerçek veri olabilir → "önce test DB'de dene" kuralı bu ortam için koruma sağlamayabilir (doğrulanacak).
+- Diğer DB'ler: `olap_test` (50 modül, servis yok), `isg` (59, odoo18-isg 8078), `odoo` (11, boş), `sovos_ci_test` (geçici).
+- `custom_addons/l10n_tr_sovos_efatura.bak_20260628` Odoo'ca modül sanılıp odoo18-test modül listesine kaydedilmiş → `/opt/odoo/backups/`'a taşınmalı.
+- Diğer özel modüller (nakliye_yonetim, mail_gateway*, wa_erp_bot) bu repoda değil; sürüm takibi/yedek durumu bilinmiyor.
+
 ---
 
 ## 2026-10-05

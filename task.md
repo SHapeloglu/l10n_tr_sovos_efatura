@@ -15,6 +15,8 @@
 - [ ] **Güvenlik (sunucu, modül dışı):** Ollama 11434 (auth yok, herkese açık), VNC 5901, Docker 8090 (ufw'yi atlar), 8080 — kullanıcı kim/nereden kullanıldığını bildirecek
 - [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
 
+- [ ] **Ortam netleştirme:** `olap_prod` boş (12 çekirdek modül); tüm projeler `odoo18-test`'te → gerçek kullanım hangi DB'de? (fatura/partner sayısı + son giriş sorgusu kullanıcıya verildi). Cevaba göre "test önce" akışını yeniden kur (ör. odoo18-test'in kopyasından ayrı bir deneme DB'si)
+- [ ] `custom_addons/l10n_tr_sovos_efatura.bak_20260628` → `/opt/odoo/backups/` taşı (Odoo modül listesine karışıyor)
 - [ ] **Prod DB'de modül durumu:** `olap_prod`'da `l10n_tr_sovos_efatura` `uninstalled` görünüyor — doğrula; prod'da kullanılacaksa önce `olap_prod` yedeği, sonra `-i l10n_tr_sovos_efatura` (kullanıcı onayıyla, Sovos şirket ayarları + test modu açık başla)
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
 - [ ] (İsteğe bağlı) Hata yolunda doğrulama XML eki / `x_validation_errors` rollback'te kayboluyor; kalıcı olması istenirse hata sonrası ayrı bir 'hata raporu' adımı tasarla (ayrı cursor kilitlenme riski nedeniyle reddedildi)
