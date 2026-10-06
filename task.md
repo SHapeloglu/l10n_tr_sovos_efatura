@@ -2,7 +2,7 @@
 
 ## 🔜 Sıradaki
 
-- [ ] **Güvenlik (sunucu, modül dışı):** Odoo conf'a `http_interface = 127.0.0.1` + `proxy_mode = True`; `admin_passwd` (14 kr.) yenile — komutlar hazır, kullanıcı uygulayacak
+- [ ] **Sunucu (modül dışı):** `odoo18-prod/test.olap.com.tr` SSL sertifikaları 2026-09-23'ten beri süresi dolmuş; DNS çözülmüyor, certbot 7 yenileme hatası
 - [ ] **Güvenlik (sunucu, modül dışı):** Ollama 11434 (auth yok, herkese açık), VNC 5901, Docker 8090 (ufw'yi atlar), 8080 — kullanıcı kim/nereden kullanıldığını bildirecek
 - [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
 
@@ -16,6 +16,7 @@
 _(şu anda boş)_
 
 ## ✅ Tamamlanan
+- [x] Odoo conf: `http_interface = 127.0.0.1`, `proxy_mode = True`, yeni `admin_passwd` — nginx üzerinden 200 (2026-10-06)
 - [x] PostgreSQL 5432 ufw kuralı 4 IP'ye daraltıldı; pg_hba `host` → `hostssl` (2026-10-06)
 - [x] prod/test conf: `db_name` + anchor'lı `dbfilter` + `list_db = False` — servisler arası çapraz cron çalışması ve DB yöneticisi kapatıldı (2026-10-06)
 - [x] `odoo18-prod` 18.0.8.0.5 koduyla yeniden başlatıldı, hata yok (2026-10-06)

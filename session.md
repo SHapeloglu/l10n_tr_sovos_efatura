@@ -97,6 +97,12 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     `152.55.176.240` satırı `host` → `hostssl` (yedek `/root/pg_hba.conf.bak_20261006`).
     Bekleyen (kullanıcı kararı): Ollama 11434 kimlik doğrulamasız açık, VNC 5901 açık, Docker 8090 ufw'yi atlıyor,
     8080 (python3) bilinmiyor, 1433'te dinleyen yok; Odoo `http_interface = 127.0.0.1` + `proxy_mode = True` + yeni `admin_passwd` (14 kr.).
+  - **Uygulandı (`/root/odoo_harden.sh`, conf yedekleri `*.conf.bak_20261006_032503`):** prod+test conf'a
+    `http_interface = 127.0.0.1`, `proxy_mode = True`, servis başına yeni 43 karakterlik `admin_passwd`
+    (`/root/odoo_admin_passwd_20261006_032503.txt`, kullanıcı kaydedip silecek). 8074-8077 yalnızca 127.0.0.1;
+    nginx üzerinden prod/test `/web/login` 200.
+  - **Modül dışı bulgu:** `odoo18-prod/test.olap.com.tr` Let's Encrypt sertifikalarının süresi 2026-09-23'te dolmuş;
+    certbot.timer çalışıyor ama 7 yenileme başarısız; alan adları sunucudan DNS'te çözülmüyor (yenileme bu yüzden başarısız olabilir).
 
 ---
 
