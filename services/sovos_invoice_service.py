@@ -373,9 +373,12 @@ class SovosInvoiceService:
         her günü ayrı çağrı yaparak chunk'lar (günlük döngü).
 
         Args:
-            date_from (date): Sorgu başlangıç tarihi (dahil)
-            date_to   (date): Sorgu bitiş tarihi (dahil), date_from ile aynı
-                              veya en fazla 1 gün sonrası olmalı.
+            date_from (date): Sorgu başlangıç günü (dahil, 00:00:00)
+            date_to   (date): Sorgu bitiş günü (dahil, 23:59:59); aralık 1 günü
+                              geçemeyeceği için pratikte date_from ile aynı gün.
+
+        FromDate/ToDate şemada xs:dateTime (Sovos örnek istemcisi,
+        ClientEInvoiceServicesTypes-2.xsd); yalnız tarih göndermek geçersiz/0 dakikalık aralık olur.
 
         Returns: list[dict] — [{'uuid': '...', 'sender_vkn': '...', 'invoice_date': '...'}, ...]
         """
@@ -396,8 +399,8 @@ class SovosInvoiceService:
         ) % (
             datetime.now().strftime('%Y%m%d%H%M%S'),
             self.user, self.password, self.sender_vkn,
-            date_from.strftime('%Y-%m-%d'),
-            date_to.strftime('%Y-%m-%d'),
+            date_from.strftime('%Y-%m-%dT00:00:00'),
+            date_to.strftime('%Y-%m-%dT23:59:59'),
         )
         root = self._post('GetUblList', body)
         invoices = []
