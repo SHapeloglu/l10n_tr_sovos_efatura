@@ -16,6 +16,7 @@ import base64
 import hashlib
 import io
 import logging
+from xml.sax.saxutils import escape
 import zipfile
 
 import requests
@@ -45,8 +46,9 @@ class SovosArchiveService:
                      InvoiceService kullanıcısından farklı olabilir.
         """
         self.company     = company
-        self.user        = company.x_sovos_archive_user    # e-Arşiv kullanıcısı
-        self.password    = company.x_sovos_archive_pass
+        # SOAP gövdesine %s ile yazıldığı için XML'e kaçışlanır (& < > şifreyi bozmasın)
+        self.user        = escape(company.x_sovos_archive_user or '')    # e-Arşiv kullanıcısı
+        self.password    = escape(company.x_sovos_archive_pass or '')
         self.sender_vkn  = company.x_sovos_sender_vkn
         self.template_id = company.x_sovos_template_id or ''  # PDF şablon ID
         self.test_mode   = company.x_sovos_test_mode

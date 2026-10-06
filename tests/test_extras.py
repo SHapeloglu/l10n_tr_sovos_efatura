@@ -28,7 +28,7 @@ class TestEarsivEmail(SovosTestCommon):
         receiverEmail parametresi olarak iletilmeli.
         Spec §14.3: receiverEmail=partner.email or None
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         inv = self._create_invoice(partner=self.partner_earsiv)
 
@@ -58,7 +58,7 @@ class TestEarsivEmail(SovosTestCommon):
         FR-13: partner.email boşsa ReceiverEmail=None olarak iletilmeli,
         hata fırlatılmamalı.
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         partner_no_email = self.env['res.partner'].create({
             'name': 'E-postasız Müşteri',
@@ -69,7 +69,7 @@ class TestEarsivEmail(SovosTestCommon):
             'email': False,
         })
 
-        inv = self._create_invoice(partner=partner_no_email)
+        inv = self._create_invoice(partner=partner_no_email, x_efatura_scenario='EARSIVFATURA')
 
         captured_calls = []
 
@@ -92,7 +92,7 @@ class TestEarsivEmail(SovosTestCommon):
         partner.email içermeli.
         Spec §14.3: email_xml = '<ear:receiverEmail>%s</ear:receiverEmail>'
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
         from lxml import etree
 
         captured_body = []
@@ -129,7 +129,7 @@ class TestConnectionTest(SovosTestCommon):
         AC-13: e-Fatura bağlantı testi başarılıysa 'success' tipinde
         display_notification action döndürmeli.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         with patch.object(SovosInvoiceService, 'test_connection', return_value=(True, 'OK')):
             result = self.company.action_test_invoice_connection()
@@ -143,7 +143,7 @@ class TestConnectionTest(SovosTestCommon):
         """
         AC-13: e-Fatura bağlantı testi başarısızsa UserError fırlatılmalı.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
 
         with patch.object(SovosInvoiceService, 'test_connection',
                           return_value=(False, 'AUTH_ERROR')):
@@ -157,7 +157,7 @@ class TestConnectionTest(SovosTestCommon):
         """
         AC-13: e-Arşiv bağlantı testi başarılıysa success bildirimi döndürmeli.
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         with patch.object(SovosArchiveService, 'test_connection', return_value=(True, 'OK')):
             result = self.company.action_test_archive_connection()
@@ -168,7 +168,7 @@ class TestConnectionTest(SovosTestCommon):
         """
         AC-13: e-Arşiv bağlantı testi başarısızsa UserError fırlatılmalı.
         """
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         with patch.object(SovosArchiveService, 'test_connection',
                           return_value=(False, 'ARCHIVE_AUTH_ERROR')):
@@ -181,8 +181,8 @@ class TestConnectionTest(SovosTestCommon):
         birbirinden bağımsız olmalı.
         İkisi ayrı buton — ayrı ayrı test edilebilmeli.
         """
-        from l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
-        from l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service import SovosInvoiceService
+        from odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service import SovosArchiveService
 
         with patch.object(SovosInvoiceService, 'test_connection', return_value=(True, 'OK')), \
              patch.object(SovosArchiveService, 'test_connection',

@@ -432,6 +432,20 @@ urun_satirlar = invoice_line_ids.filtered(
 
 ## G
 
+### `GIB_PENDING` / `GIB_RETRY_SAME_UUID` / `GIB_SOVOS_SUPPORT`
+**Ne:** `services/constants.py`'de tanımlı GİB durum kodu kümeleri. Hangi kodun hangi aksiyona yol açtığını tek yerden yönetir.
+
+| Set | Örnek Kodlar | Aksiyon |
+|-----|-------------|---------|
+| `GIB_PENDING` | 1000, 1100, **1200**, **1220** | Bekle, cron sorgular. **1220: tekrar gönderme** (→ 1163) |
+| `GIB_SUCCESS` | 1300 | `accepted` |
+| `GIB_RETRY_SAME_UUID` | 1150, **1181**, **1190–1195** | Aynı UUID, düzelt+gönder |
+| `GIB_SOVOS_SUPPORT` | 1171, **1176–1177** | Teknik destek |
+| `GIB_CANCEL_AND_NEW` | 1163 | İptal + yeni fatura |
+| `GIB_NOTIFY_ADMIN` | 1215 | `sent` KALIR, admin bildir |
+
+**Neden tek kaynak?** `account_move.py` ve `resend_wizard.py` aynı seti import eder — senkronizasyon riski yok.
+
 ### `getattr(nesne, 'metod_adi')`
 String ile nesnenin metoduna veya özelliğine erişir.
 Dinamik metod çağrısı için kullanılır.
@@ -535,6 +549,7 @@ return {
 ---
 
 ### `ir.attachment`
+**Bu modülde kullanım:** UBL-XML önizlemesi `ir.attachment` olarak saklanmalı (düz metin chatter yerine) — kullanıcı indirebilir, DB şişmez.
 Odoo'nun dosya saklama modeli. PDF, XML, resim gibi dosyalar burada tutulur.
 Varsayılan: Linux dosya sisteminde (DB'de yol tutulur).
 
@@ -1061,6 +1076,13 @@ Zorunlu değil ama kod okunabilirliği için tercih edilir.
 
 ## Z
 
+### `x_efatura_alias`
+**Ne:** `res.partner`'da tutulan GİB **posta kutusu (PK) etiketi**. Sovos `sendUBL` çağrısında `ReceiverIdentifier` alanına bu değer gönderilir.
+
+**Neden VKN değil?** GİB alıcıyı VKN ile değil, kayıtlı posta kutusu etiketiyle tanımlar. `partner.vat` (VKN) gönderilirse **1181 ADRES BULUNAMADI** hatası alınır.
+
+**Boşsa ne olur?** `getUserList` cache'den doldurulur. Cache de yoksa `UserError` fırlatılır.
+
 ### `[:1]` (Recordset Dilimleme)
 Recordset'in ilk kaydını alır. `limit=1` ile arama yerine mevcut recordset'te kullanılır.
 Boş recordset'te `IndexError` değil boş recordset döner.
@@ -1130,6 +1152,17 @@ kayit.aktif_santiye_id = aktif_atama[:1].santiye_id  # Boşsa False döner
 | `MissingError` | Kayıt silinmiş | Kayıt bulunamadı |
 
 ---
+
+### GİB / Sovos Kısıtları
+
+| Kısıt | Değer |
+|-------|-------|
+| Geriye dönük fatura | Max **7 gün** (VUK md.231) |
+| getUBLList tarih aralığı | Max **1 gün** per sorgu |
+| getUserList sıklığı | **Günde 1 kez** tavsiye |
+| ReceiverIdentifier | **PK etiketi (alias)** — VKN değil |
+| 1220 sonrası | **Tekrar gönderim yasak** → 1163 |
+| Desteklenmeyen profil | IHRACAT, YOLCUBERABER |
 
 ### Log Seviyeleri
 

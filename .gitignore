@@ -1,0 +1,14 @@
+# Python önbellekleri
+__pycache__/
+*.py[cod]
+
+# Editör / işletim sistemi
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# GİB şema dosyaları repoya alınmaz; sunucuda setup_schemas.sh ile kurulur.
+# (services/schemas/VERSION izlenir)
+services/schemas/*
+!services/schemas/VERSION

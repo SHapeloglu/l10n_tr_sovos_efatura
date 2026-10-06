@@ -149,9 +149,24 @@ class UblBuilder:
              (invoice.invoice_date_time or datetime.now()).strftime('%H:%M:%S')
              if hasattr(invoice, 'invoice_date_time') else '00:00:00')
 
-        _sub(root, 'cbc', 'InvoiceTypeCode', 'SATIS')        # Satış faturası
+        # DÜZELTME Madde 7: move_type'a göre InvoiceTypeCode belirlenir.
+        # out_invoice → SATIS (normal satış faturası)
+        # out_refund  → IADE (iade / kredi notu faturası)
+        # GİB'te IADE ayrı bir süreçtir; InvoiceTypeCode yanlış olursa 1150 hatası alınır.
+        _invoice_type_code = 'IADE' if invoice.move_type == 'out_refund' else 'SATIS'
+        _sub(root, 'cbc', 'InvoiceTypeCode', _invoice_type_code)
         _sub(root, 'cbc', 'DocumentCurrencyCode', invoice.currency_id.name or 'TRY')
         _sub(root, 'cbc', 'LineCountNumeric', str(len(invoice.invoice_line_ids)))
+
+        # Note (0..n): Fatura notu / açıklaması — opsiyonel, Catalogue 0..n
+        # Odoo'daki narration alanından beslenir (fatura sayfası alt bölümü).
+        # Sipariş no, proje kodu, özel talimatlar gibi bilgiler buraya yazılır.
+        # Birden fazla satır varsa her satır ayrı <Note> elementi olur.
+        if invoice.narration:
+            for note_line in (invoice.narration or '').split('\n'):
+                note_line = note_line.strip()
+                if note_line:
+                    _sub(root, 'cbc', 'Note', note_line)
 
         # ── Taraf Bilgileri ────────────────────────────────────────────────
         self._build_supplier(root, invoice)   # Gönderici (şirketimiz)

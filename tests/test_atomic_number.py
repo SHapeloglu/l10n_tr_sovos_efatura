@@ -118,6 +118,24 @@ class TestAtomicNumber(SovosTestCommon):
     # "Ne olursa olsun numara kaybolmasın" ilkesi
     # ════════════════════════════════════════════════════════════════════
 
+    def _assert_number_not_kept(self, inv):
+        """
+        Hata yolunda atomik numaranın garantisi.
+
+        _efatura_post_single hata durumunda _release_number() çağırıp UserError
+        fırlatır; UserError tüm transaction'ı geri alır (testte assertRaises
+        savepoint'i, üretimde istek transaction'ı). Bu yüzden 'released' durumu
+        kalıcı OLMAZ — fatura rezervasyondan önceki haline döner:
+          • numara faturaya bağlı kalmaz (x_reserved_number boş, durum reserved/confirmed değil)
+          • fatura draft kalır, 'sent' olmaz
+        ir.sequence (standard) değeri geri alınmaz → numarada boşluk (VUK md.231 kabul).
+        """
+        self.assertFalse(inv.x_reserved_number,
+            'Hata sonrası rezerve numara faturada kalmamalı')
+        self.assertNotIn(inv.x_number_status, ('reserved', 'confirmed'))
+        self.assertEqual(inv.state, 'draft', 'Hata sonrası fatura draft kalmalı')
+        self.assertNotEqual(inv.x_efatura_status, 'sent')
+
     def test_number_released_on_ubl_build_failure(self):
         """
         UBL üretimi başarısız → numara serbest, fatura taslak kalmalı.
@@ -136,19 +154,15 @@ class TestAtomicNumber(SovosTestCommon):
 
         # _mock_ubl_builder() kullanmıyoruz — doğrudan HATA mock'u yazıyoruz
         with patch(
-            'l10n_tr_sovos_efatura.services.ubl_builder.UblBuilder.build',
+            'odoo.addons.l10n_tr_sovos_efatura.services.ubl_builder.UblBuilder.build',
             side_effect=Exception('lxml serialize hatası'),  # exception fırlatır
         ):
-            with self.assertRaises(UserError):
+            with self.assertRaises(UserError) as cm:
                 inv.action_post()
 
-        # Numara serbest bırakıldı mı?
-        self.assertEqual(inv.x_number_status, 'released')
-        # Hata durumu set edildi mi?
-        self.assertEqual(inv.x_efatura_status, 'error')
-        # Fatura taslak mı kaldı?
-        self.assertEqual(inv.state, 'draft',
-            'UBL üretim hatasında fatura draft kalmalıydı')
+        # Numara faturada kalmadı mı, fatura taslak mı?
+        self._assert_number_not_kept(inv)
+        self.assertIn('UBL üretim hatası', str(cm.exception))
 
     def test_number_released_on_xsd_failure(self):
         """
@@ -167,14 +181,13 @@ class TestAtomicNumber(SovosTestCommon):
         inv = self._create_invoice()
         with self._mock_ubl_builder(), \
              self._mock_validator_xsd_fail(['cbc:ID zorunlu']):
-            with self.assertRaises(UserError):
+            with self.assertRaises(UserError) as cm:
                 inv.action_post()
 
-        self.assertEqual(inv.x_number_status, 'released')
-        self.assertEqual(inv.x_efatura_status, 'error')
-        self.assertEqual(inv.state, 'draft')
-        # Hata mesajı x_validation_errors alanında saklanmış olmalı
-        self.assertIn('cbc:ID', inv.x_validation_errors)
+        self._assert_number_not_kept(inv)
+        # Validasyon hataları kullanıcıya hata mesajında gösterilmeli
+        self.assertIn('XSD', str(cm.exception))
+        self.assertIn('cbc:ID', str(cm.exception))
 
     def test_number_released_on_schematron_failure(self):
         """
@@ -189,12 +202,11 @@ class TestAtomicNumber(SovosTestCommon):
         inv = self._create_invoice()
         with self._mock_ubl_builder(), \
              self._mock_validator_schematron_fail(['BR-01: Tutar tutarsız']):
-            with self.assertRaises(UserError):
+            with self.assertRaises(UserError) as cm:
                 inv.action_post()
 
-        self.assertEqual(inv.x_number_status, 'released')
-        self.assertEqual(inv.state, 'draft')
-        self.assertIn('BR-01', inv.x_validation_errors)
+        self._assert_number_not_kept(inv)
+        self.assertIn('BR-01', str(cm.exception))
 
     def test_number_released_on_xml_parse_failure(self):
         """
@@ -214,7 +226,7 @@ class TestAtomicNumber(SovosTestCommon):
             with self.assertRaises(UserError) as cm:
                 inv.action_post()
 
-        self.assertEqual(inv.x_number_status, 'released')
+        self._assert_number_not_kept(inv)
         # Hata mesajında katman adı geçmeli
         self.assertIn('XML_PARSE', str(cm.exception))
 
@@ -235,14 +247,12 @@ class TestAtomicNumber(SovosTestCommon):
         with self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
              self._mock_sovos_failure('Zaman aşımı (60s)'):
-            with self.assertRaises(UserError):
+            with self.assertRaises(UserError) as cm:
                 inv.action_post()
 
-        self.assertEqual(inv.x_number_status, 'released')
-        self.assertEqual(inv.x_efatura_status, 'error')
-        # button_draft() çağrılarak fatura draft'a döndürülmüş olmalı
-        self.assertEqual(inv.state, 'draft',
-            "Sovos hatasında button_draft() faturayı draft'a döndürmeliydi")
+        # Fatura posted kalmamalı, numara faturada kalmamalı
+        self._assert_number_not_kept(inv)
+        self.assertIn('Zaman aşımı', str(cm.exception))
 
     def test_number_released_on_rate_limit(self):
         """
@@ -257,7 +267,7 @@ class TestAtomicNumber(SovosTestCommon):
              self._mock_sovos_failure('RATE_LIMIT_429'):
             with self.assertRaises(UserError):
                 inv.action_post()
-        self.assertEqual(inv.x_number_status, 'released')
+        self._assert_number_not_kept(inv)
 
     # ════════════════════════════════════════════════════════════════════
     # ÖN KOŞUL KONTROLLERİ
@@ -391,6 +401,13 @@ class TestAtomicNumber(SovosTestCommon):
                 ('type', '=', 'general'),
                 ('company_id', '=', self.company.id),
             ], limit=1).id,
+            # Odoo 18: satırsız fiş post edilemez → dengeli borç/alacak satırları
+            'line_ids': [
+                (0, 0, {'name': 'Borç', 'account_id': self.account_income.id,
+                        'debit': 100.0, 'credit': 0.0}),
+                (0, 0, {'name': 'Alacak', 'account_id': self.account_income.id,
+                        'debit': 0.0, 'credit': 100.0}),
+            ],
         })
         combo = efatura_inv | misc_move
 

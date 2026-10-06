@@ -80,7 +80,7 @@ class TestCronSync(SovosTestCommon):
         }]
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_inbound_list',
             return_value=mock_invoices,
         ):
@@ -113,7 +113,7 @@ class TestCronSync(SovosTestCommon):
             'invoice_date': '2026-06-01',
         }]
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_inbound_list',
             return_value=mock_invoices,
         ):
@@ -154,7 +154,7 @@ class TestCronSync(SovosTestCommon):
         # Aynı UUID tekrar Sovos'tan geliyor
         mock_invoices = [{'uuid': existing_uuid, 'sender_vkn': '1111111111'}]
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_inbound_list',
             return_value=mock_invoices,
         ):
@@ -181,7 +181,7 @@ class TestCronSync(SovosTestCommon):
         inv = self._create_sent_invoice()   # x_efatura_type='efatura' (varsayılan)
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_envelope_status',
             return_value=(1300, 'Başarılı'),    # GİB kabul etti
         ) as mock_status:
@@ -205,7 +205,7 @@ class TestCronSync(SovosTestCommon):
         inv.write({'x_efatura_type': 'earsiv'})
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
             '.SovosInvoiceService.get_envelope_status',
         ) as mock_status:
             self.env['sovos.sync']._sync_efatura_status_for_company(self.company)
@@ -227,7 +227,7 @@ class TestCronSync(SovosTestCommon):
         inv.write({'x_efatura_type': 'earsiv'})
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_archive_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service'
             '.SovosArchiveService.get_invoice_status',
             return_value=(1300, 'Başarılı'),
         ) as mock_status:
@@ -242,7 +242,7 @@ class TestCronSync(SovosTestCommon):
         inv = self._create_sent_invoice()   # x_efatura_type='efatura'
 
         with patch(
-            'l10n_tr_sovos_efatura.services.sovos_archive_service'
+            'odoo.addons.l10n_tr_sovos_efatura.services.sovos_archive_service'
             '.SovosArchiveService.get_invoice_status',
         ) as mock_status:
             self.env['sovos.sync']._sync_earsiv_status_for_company(self.company)
@@ -338,9 +338,9 @@ class TestCronSync(SovosTestCommon):
                 raise Exception('Şirket 1 hatası')
 
         # patch.object: sync instance'ının metodunu değiştir
-        with patch.object(sync, '_sync_incoming_for_company', side_effect=failing_then_ok), \
-             patch.object(sync, '_notify_admin'):   # bildirim de mock'la (gereksiz log)
-            sync._cron_run_for_all_companies('cron_sync_incoming_invoices')
+        with patch.object(type(sync), '_sync_incoming_for_company', side_effect=failing_then_ok), \
+             patch.object(type(sync), '_notify_admin'):   # bildirim de mock'la (gereksiz log)
+            sync._cron_run_for_all_companies('_sync_incoming_for_company')
 
         # Şirket 2 çağrıldı mı? (Şirket 1 çaksa bile)
         self.assertIn(company2.id, call_order,
@@ -385,7 +385,7 @@ class TestCronSync(SovosTestCommon):
         Kabul/red almış faturalara uyarı mesajı EKLENMEMELI.
 
         Alıcı zaten yanıt verdi → artık deadline uyarısı anlamsız.
-        patch.object(inv, 'message_post'): bu faturanın mesaj ekleme metodunu izle.
+        patch.object(type(inv), 'message_post'): bu faturanın mesaj ekleme metodunu izle.
         assert_not_called(): hiç çağrılmadı = mesaj eklenmedi.
         """
         inv = self._create_sent_invoice(scenario='TICARIFATURA')
@@ -394,7 +394,7 @@ class TestCronSync(SovosTestCommon):
             'x_inv_response_status': 'kabul',    # zaten kabul geldi
         })
 
-        with patch.object(inv, 'message_post') as mock_post:
+        with patch.object(type(inv), 'message_post') as mock_post:
             self.env['sovos.sync']._check_8day_for_company(self.company)
         # Kabul almış faturaya mesaj eklenmemeli
         mock_post.assert_not_called()
@@ -415,7 +415,7 @@ class TestCronSync(SovosTestCommon):
         })
 
         with patch(
-            'l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
+            'odoo.addons.l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
         ) as mock_refresh:
             self.env['sovos.sync']._refresh_vkn_for_company(self.company)
 
@@ -433,10 +433,17 @@ class TestCronSync(SovosTestCommon):
             'customer_rank': 1,
         })
 
+        # autospec=True → mock 'self' (partner recordset) ile çağrılır; DB'deki
+        # demo partnerlar da bayat olabileceği için yalnızca test partnerına bakılır.
         with patch(
-            'l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type'
+            'odoo.addons.l10n_tr_sovos_efatura.models.res_partner.ResPartner.refresh_efatura_type',
+            autospec=True,
         ) as mock_refresh:
             self.env['sovos.sync']._refresh_vkn_for_company(self.company)
 
+        refreshed_ids = set()
+        for c in mock_refresh.call_args_list:
+            refreshed_ids.update(c.args[0].ids)
         # Taze partner için refresh çağrılmamalı
-        mock_refresh.assert_not_called()
+        self.assertNotIn(self.partner_efatura.id, refreshed_ids,
+            'Taze cache\'li partner yenilenmemeli')

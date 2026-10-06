@@ -125,7 +125,7 @@ class TestGibStatusCodes(SovosTestCommon):
         Bu sayede kod değişikliği anında test devreye girer.
         """
         # Modülden direkt import et (sabitleri test ediyoruz)
-        from l10n_tr_sovos_efatura.models.account_move import GIB_SUCCESS, GIB_ACCEPTED_BY_RECEIVER
+        from odoo.addons.l10n_tr_sovos_efatura.models.account_move import GIB_SUCCESS, GIB_ACCEPTED_BY_RECEIVER
 
         self.assertNotIn(1305, GIB_SUCCESS,
             '1305 GIB_SUCCESS içinde olmamalı (v6.1 düzeltmesi)')
@@ -203,7 +203,7 @@ class TestGibStatusCodes(SovosTestCommon):
             (patch() modül seviyesinde, patch.object() instance/sınıf seviyesinde)
         """
         # patch.object: self.inv'in _notify_admin_gib_error metodunu izle
-        with patch.object(self.inv, '_notify_admin_gib_error') as mock_notify:
+        with patch.object(type(self.inv), '_notify_admin_gib_error') as mock_notify:
             self.inv._process_gib_status(1104)
             # Bildirim tam olarak 1 kez çağrılmalı
             mock_notify.assert_called_once()
@@ -221,7 +221,7 @@ class TestGibStatusCodes(SovosTestCommon):
         Bu ciddi bir hatadır — UUID generator'da sorun var demek.
         Admin bilgilendirilmeli, manuel inceleme gerekebilir.
         """
-        with patch.object(self.inv, '_notify_admin_gib_error') as mock_notify:
+        with patch.object(type(self.inv), '_notify_admin_gib_error') as mock_notify:
             self.inv._process_gib_status(1163)
             mock_notify.assert_called_once()
         self.assertEqual(self.inv.x_efatura_status, 'error')
@@ -273,27 +273,25 @@ class TestGibStatusCodes(SovosTestCommon):
     # BİLİNEN BUG: 1215 SONRASI CRON KİLİTLENMESİ
     # ════════════════════════════════════════════════════════════════════
 
-    def test_1215_sets_error_and_notifies_admin(self):
+    def test_1215_keeps_sent_and_notifies_admin_once(self):
         """
         1215 → 4 başarısız deneme + admin bildirim.
 
-        BİLİNEN BUG belgeleme testi:
-            1215 gelince _set_error() çağrılıyor → x_efatura_status='error'
-            Cron sadece 'sent'/'sending' durumlarını sorguluyor.
-            Bu fatura artık 'error' → cron onu bir daha BULAMAZ → KILITLENDI.
-
-            Bu test mevcut yanlış davranışı belgeler.
-            Düzeltme sonrası TODO yorumları aktive edilmeli.
+        Eski bug: 1215 gelince status='error' oluyordu; cron yalnızca
+        'sent'/'sending' sorguladığı için fatura takipten düşüyordu.
+        DÜZELTME #1 sonrası: status 'sent' kalır, admin bir kez bilgilendirilir.
         """
-        with patch.object(self.inv, '_notify_admin_gib_error') as mock_notify:
+        with patch.object(type(self.inv), '_notify_admin_gib_error') as mock_notify:
+            self.inv._process_gib_status(1215)
+            mock_notify.assert_called_once()
+            # İkinci 1215 aynı fatura için tekrar bildirim üretmemeli
             self.inv._process_gib_status(1215)
             mock_notify.assert_called_once()
 
-        self.assertEqual(self.inv.x_efatura_status, 'error',
-            '1215 sonrası status=error → cron bir daha bulamaz (bilinen bug)')
-        # TODO: Düzeltme sonrası bu satırları aktive et:
-        # self.assertIn(self.inv.x_efatura_status, ('sent', 'sending'))
-        # veya self.assertTrue(self.inv.x_gib_pending_retry)
+        # DÜZELTME #1: 1215 sonrası fatura 'sent' kalır → cron takibi sürer
+        self.assertEqual(self.inv.x_efatura_status, 'sent',
+            '1215 sonrası status sent kalmalı (cron kilitlenmesi düzeltildi)')
+        self.assertTrue(self.inv.x_gib_admin_notified)
 
     # ════════════════════════════════════════════════════════════════════
     # KRİTİK: İKİ SET SENKRONİZASYONU
@@ -316,14 +314,15 @@ class TestGibStatusCodes(SovosTestCommon):
         symmetric_difference(): A'da olup B'de olmayan VEYA B'de olup A'da olmayan elemanlar.
         Boş set dönmesi = tamamen aynılar.
         """
-        from l10n_tr_sovos_efatura.models.account_move import GIB_RETRY_SAME_UUID
-        from l10n_tr_sovos_efatura.wizards.resend_invoice_wizard import RETRY_SAME_UUID
+        # Tek kaynak: services/constants.py. Model ve sihirbaz aynı nesneyi kullanmalı.
+        from odoo.addons.l10n_tr_sovos_efatura.services import constants
+        from odoo.addons.l10n_tr_sovos_efatura.models import account_move
+        from odoo.addons.l10n_tr_sovos_efatura.wizards import resend_invoice_wizard
 
-        diff = GIB_RETRY_SAME_UUID.symmetric_difference(RETRY_SAME_UUID)
-        self.assertEqual(diff, set(),
-            'Set farkı bulundu: %s\n'
-            'account_move.py: %s\n'
-            'resend_wizard.py: %s' % (diff, GIB_RETRY_SAME_UUID, RETRY_SAME_UUID))
+        self.assertIs(account_move.GIB_RETRY_SAME_UUID, constants.GIB_RETRY_SAME_UUID,
+            'account_move.py GIB_RETRY_SAME_UUID setini constants.py\'den almalı')
+        self.assertIs(resend_invoice_wizard.GIB_RETRY_SAME_UUID, constants.GIB_RETRY_SAME_UUID,
+            'resend_invoice_wizard.py GIB_RETRY_SAME_UUID setini constants.py\'den almalı')
 
     # ════════════════════════════════════════════════════════════════════
     # 8 GÜNLÜK UYARI HESAPLAMA
@@ -429,7 +428,7 @@ class TestGibStatusCodes(SovosTestCommon):
 
         Bu test her bilinen kod için boş olmayan mesaj döndüğünü doğrular.
         """
-        from l10n_tr_sovos_efatura.models.account_move import _gib_msg
+        from odoo.addons.l10n_tr_sovos_efatura.models.account_move import _gib_msg
         # Bilinen tüm kritik kodlar için mesaj var mı?
         for code in [1101, 1103, 1104, 1150, 1160, 1215, 1300, 1305, 1310]:
             msg = _gib_msg(code)

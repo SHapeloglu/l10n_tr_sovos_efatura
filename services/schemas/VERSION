@@ -1,39 +1,45 @@
 UBL-TR Şema Versiyonu
 =====================
-XSD: UBL-Invoice-2.1.xsd
-Schematron: UBL-TR_Main_Schematron.sch (XSLT pre-compiled: UBL-TR_Main_Schematron.sch.xsl)
+XSD  : UBL-Invoice-2.1.xsd  (maindoc/ altında)
+SCH  : UBL-TR_Main_Schematron.xml  (ham ISO Schematron — derleme gerekmez)
 
-Kaynak: https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaket.zip
+Kaynak XSD : https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/UBL-TR1.2.1_Paketi.zip
+Kaynak SCH : https://ebelge.gib.gov.tr/dosyalar/kilavuzlar/e-FaturaPaketi.zip
 Son Güncelleme: Haziran 2026
 
-GİB şema güncellemelerinde (yılda 1-2 kez) modül versiyonu yükseltilir.
-Şema dosyaları bu dizine kopyalanır ve modül güncelleme süreciyle dağıtılır.
+GİB şema güncellemelerinde (yılda 1-2 kez) setup_schemas.sh yeniden çalıştırılır.
 
-KURULUM:
-1. https://ebelge.gib.gov.tr adresinden e-FaturaPaket.zip indirin.
-2. UBL-Invoice-2.1.xsd → bu dizine kopyalayın.
-3. GİB Schematron, queryBinding="xslt2" ile üretilmiştir; lxml (XSLT 1.0)
-   kullanılamaz. Saxon HE ile derleyin:
+DİZİN YAPISI:
+  schemas/
+  ├── maindoc/
+  │   └── UBL-Invoice-2.1.xsd          ← UBL-TR1.2.1_Paketi / xsdrt/maindoc/
+  ├── common/                           ← UBL-TR1.2.1_Paketi / xsdrt/common/
+  │   ├── UBL-CommonAggregateComponents-2.1.xsd
+  │   ├── UBL-CommonBasicComponents-2.1.xsd
+  │   └── ... (14 dosya)
+  ├── UBL-TR_Main_Schematron.xml        ← e-FaturaPaketi / schematron/
+  ├── UBL-TR_Common_Schematron.xml      ← e-FaturaPaketi / schematron/
+  └── UBL-TR_Codelist.xml              ← e-FaturaPaketi / schematron/
 
-   # Gereksinim: pip install saxonche
-   python3 -c "
-   import saxonche
-   with saxonche.PySaxonProcessor(license=False) as proc:
-       xslt = proc.new_xslt30_processor()
-       # Üç aşamalı ISO Schematron pipeline:
-       # 1. iso_dsdl_include.xsl  → include birleştir
-       # 2. iso_abstract_expand.xsl → abstract genişlet
-       # 3. iso_svrl_for_xslt2.xsl  → SVRL çıktı üret
-       # GİB paketi zaten derlenmiş .sch.xsl içeriyorsa doğrudan kullanın.
-       result = xslt.transform_to_file(
-           source_file='UBL-TR_Main_Schematron.xml',
-           stylesheet_file='iso_svrl_for_xslt2.xsl',
-           output_file='UBL-TR_Main_Schematron.sch.xsl'
-       )
-   "
-   veya Saxon komut satırı ile:
-   java -jar saxon-he.jar -s:UBL-TR_Main_Schematron.xml \
-        -xsl:iso_svrl_for_xslt2.xsl \
-        -o:UBL-TR_Main_Schematron.sch.xsl
+NOT: UBL-Invoice-2.1.xsd, ../common/ ile relative path kullandığından
+maindoc/ ve common/ klasörlerinin yan yana olması zorunludur.
 
-4. Derlenmiş XSLT'yi UBL-TR_Main_Schematron.sch.xsl olarak bu dizine kopyalayın.
+KURULUM (tek komut):
+  bash setup_schemas.sh UBL-TR1.2.1_Paketi.zip e-FaturaPaketi.zip
+
+Manuel kurulum:
+  1. UBL-TR1.2.1_Paketi.zip'ten:
+     xsdrt/maindoc/UBL-Invoice-2.1.xsd  → schemas/maindoc/
+     xsdrt/common/*.xsd                  → schemas/common/
+
+  2. e-FaturaPaketi.zip'ten:
+     schematron/UBL-TR_Main_Schematron.xml   → schemas/
+     schematron/UBL-TR_Common_Schematron.xml → schemas/
+     schematron/UBL-TR_Codelist.xml          → schemas/
+
+NEDEN saxonche / XSLT 2.0 GEREKMİYOR:
+  GİB Schematron'un inv:Invoice context'li iş kuralları (50+) doğrudan
+  lxml XPath ile ubl_validator.py içinde implement edilmiştir.
+  Schematron .xml dosyaları sadece referans amaçlıdır; ubl_validator.py
+  tarafından runtime'da okunmaz.
+  lxml Odoo'nun standart bağımlılığıdır; ek kurulum gerekmez.

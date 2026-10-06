@@ -24,6 +24,7 @@ from odoo.exceptions import UserError
 # DÜZELTME #2: Tek kaynak — constants.py. İki ayrı set tanımının
 # senkronizasyon kayması riski ortadan kalktı.
 from ..services.constants import (
+    _gib_msg,
     GIB_RETRY_SAME_UUID,
     GIB_CANCEL_AND_NEW,
     GIB_SOVOS_SUPPORT,
@@ -36,45 +37,6 @@ from ..services.constants import (
 
 _logger = logging.getLogger(__name__)
 
-
-def _gib_msg(code):
-    """
-    GİB durum koduna karşılık gelen kullanıcı dostu mesajı döndürür.
-    Lazy tanımlama: her çağrıda aktif dil context'inde _() çevrilir.
-    (Module-level dict tanımı çeviriyi bozar — Odoo best practice)
-    """
-    msgs = {
-        1101: _('UBL-TR formatında sorun. Tekrar Gönder butonunu kullanın.'),
-        1103: _('Zorunlu alan boş. Fatura bilgilerini tamamlayın.'),
-        1104: _('Fatura numarası daha önce kullanılmış. Sistem yöneticisi ile iletişime geçin.'),
-        1110: _('ZIP formatı hatalı. Tekrar Gönder butonunu kullanın.'),
-        1111: _('Zarf ID uzunluğu geçersiz. Tekrar Gönder butonunu kullanın.'),
-        1120: _('Zarf arşivden kopyalanamadı. Tekrar Gönder butonunu kullanın.'),
-        1130: _('ZIP açılamadı. Tekrar Gönder butonunu kullanın.'),
-        1131: _('ZIP bir dosya içermeli. Tekrar Gönder butonunu kullanın.'),
-        1132: _('XML dosyası değil. Tekrar Gönder butonunu kullanın.'),
-        1133: _('Dosya adı uyuşmuyor. Tekrar Gönder butonunu kullanın.'),
-        1140: _('XML ayrıştırılamadı. Tekrar Gönder butonunu kullanın.'),
-        1141: _('Zarf ID eksik. Tekrar Gönder butonunu kullanın.'),
-        1142: _('Zarf ID ve ZIP adı uyuşmuyor. Tekrar Gönder butonunu kullanın.'),
-        1143: _('Geçersiz UBL versiyonu (2.1 zorunlu). Tekrar Gönder butonunu kullanın.'),
-        1150: _('Schematron kontrolü başarısız. Tekrar Gönder butonunu kullanın.'),
-        1160: _('XML şema kontrolü başarısız. Tekrar Gönder butonunu kullanın.'),
-        1161: _('İmza hatası. Sovos teknik destek ile iletişime geçin.'),
-        1162: _('İmza kaydedilemedi. Tekrar Gönder butonunu kullanın.'),
-        1163: _('Bu fatura zaten GİB\'te kayıtlı. İptal edip yeni fatura kesin.'),
-        1170: _('Schematron uyumsuz. Tekrar Gönder butonunu kullanın.'),
-        1171: _('Gönderici birim yetkisi yok. Sovos teknik destek ile iletişime geçin.'),
-        1172: _('Posta kutusu yetkisi yok. Sovos teknik destek ile iletişime geçin.'),
-        1175: _('İmza yetkisi kontrol edilemedi. Tekrar Gönder butonunu kullanın.'),
-        1210: _('Alıcıya ulaşılamadı — iptal gerekmez. Tekrar Gönder.'),
-        1215: _('GİB sistemi 4 denemede yanıt vermedi. Sistem yöneticisi bilgilendirildi. Cron takip ediyor.'),
-        1230: _('Alıcıda işlenemedi. Tekrar Gönder.'),
-        1300: _('Fatura başarıyla tamamlandı.'),
-        1305: _('Alıcı faturayı kabul etti.'),
-        1310: _('Alıcı faturayı reddetti. İptal edip yeni fatura kesin.'),
-    }
-    return msgs.get(code, _('GİB kodu %d') % code)
 
 
 class AccountMove(models.Model):
@@ -169,6 +131,17 @@ class AccountMove(models.Model):
     x_gib_admin_notified = fields.Boolean(
         string='Admin Bildirim Gönderildi', copy=False, readonly=True, default=False,
     )
+    x_efatura_match_status = fields.Selection(
+        selection=[
+            ('pending',      'Bekliyor — Eşleme Gerekli'),
+            ('review',       'İnceleme — Düşük Güven'),
+            ('matched_auto', 'Otomatik Eşlendi'),
+            ('matched',      'Manuel Eşlendi'),
+        ],
+        string='Gelen Fatura Eşleme Durumu',
+        copy=False, readonly=True,
+        help='Sadece alış faturalarında (in_invoice) kullanılır.'
+    )
 
     x_show_8day_warning = fields.Boolean(
         compute='_compute_show_8day_warning',
@@ -206,8 +179,11 @@ class AccountMove(models.Model):
           Her fatura _efatura_post_single() içinde, validasyon ve Sovos
           gönderimi başarılı olduktan sonra super() ile POSTED yapılır.
         """
+        # DÜZELTME #7 (Madde 7): out_refund (iade/kredi notu) de e-Fatura akışına dahil.
+        # GİB'te iade faturası SATIS değil IADE InvoiceTypeCode ile gönderilir.
+        # UBL builder move_type'a bakarak doğru kodu seçer.
         efatura_moves = self.filtered(
-            lambda m: m.move_type == 'out_invoice' and m.state == 'draft'
+            lambda m: m.move_type in ('out_invoice', 'out_refund') and m.state == 'draft'
         )
         other_moves = self - efatura_moves
 
@@ -293,9 +269,15 @@ class AccountMove(models.Model):
         if not valid:
             self._release_number()
             self.write({'x_validation_errors': '\n'.join(errors)})
-            err_detail = errors[0] if errors else ''
-            self._set_error(_('UBL validasyon hatası [%s]: %s') % (layer, err_detail))
-            raise UserError(_('UBL validasyon hatası [%s]: %s') % (layer, err_detail))
+            # UserError transaction'ı geri aldığı için alanlara/eke yazılanlar kalıcı
+            # olmaz; kullanıcının hataları görebilmesi için ilk 5 hata mesajda gösterilir.
+            err_detail = '\n'.join('• %s' % e for e in errors[:5])
+            if len(errors) > 5:
+                err_detail += '\n' + _('… ve %s hata daha') % (len(errors) - 5)
+            # Madde 10: Hatalı XML'i ir.attachment olarak kaydet (chatter'a bağlantı ekle)
+            self._attach_validation_xml(xml_bytes, layer)
+            self._set_error(_('UBL validasyon hatası [%s]:\n%s') % (layer, err_detail))
+            raise UserError(_('UBL validasyon hatası [%s]:\n%s') % (layer, err_detail))
 
         # ── 8. Odoo POSTED ────────────────────────────────────────────────
         # Validasyon geçti → Odoo faturasını onayla.
@@ -315,8 +297,15 @@ class AccountMove(models.Model):
                 svc = SovosArchiveService(company)
                 envelope_uuid = svc.send_invoice(xml_bytes, inv_uuid, partner)
 
-            # ── 10. Başarı ────────────────────────────────────────────────
-            self.write({
+            # ── 10. Başarı — DB'ye yaz ───────────────────────────────────
+            # DÜZELTME Madde 8: Sovos gönderim başarılı ama DB write başarısız
+            # edge case koruması:
+            #   - Sovos faturayı kabul etti → GİB o numarayı biliyor
+            #   - Odoo DB yazımı başarısız → Odoo bilmiyor
+            #   - Sonraki gönderimde aynı numara → GİB 1104 hatası
+            # Çözüm: write() ayrı savepoint içinde. DB hatası olursa minimum
+            # bilgi (UUID + numara) kurtarılır; cron faturayı UUID ile bulur.
+            _success_vals = {
                 'name':                    invoice_number,
                 'x_sovos_uuid':            inv_uuid,
                 'x_sovos_envelope_uuid':   envelope_uuid,
@@ -329,14 +318,36 @@ class AccountMove(models.Model):
                 'x_efatura_error_msg':     False,
                 'x_validation_errors':     False,
                 'x_gib_admin_notified':    False,
-            })
-            # TICARIFATURA → 8 günlük yanıt süresi başlat
+            }
             if scenario == 'TICARIFATURA':
-                self.write({
+                _success_vals.update({
                     'x_inv_response_status':   'beklemede',
                     'x_inv_response_deadline': date.today() + timedelta(days=8),
                 })
-            _logger.info('e-Fatura gönderildi: %s → UUID=%s', invoice_number, inv_uuid)
+            try:
+                with self.env.cr.savepoint():
+                    self.write(_success_vals)
+            except Exception as _db_err:
+                _logger.critical(
+                    'KRİTİK: Sovos başarılı ama DB yazımı başarısız! '
+                    'Fatura: %s  UUID: %s  Hata: %s  '
+                    'Cron durum sorgusunu manuel çalıştırın.',
+                    invoice_number, inv_uuid, _db_err,
+                )
+                try:
+                    with self.env.cr.savepoint():
+                        self.write({
+                            'x_sovos_uuid':      inv_uuid,
+                            'x_reserved_number': invoice_number,
+                            'x_efatura_status':  'error',
+                            'x_efatura_error_msg': _(
+                                'GİB\'e gönderildi (UUID: %s) ancak Odoo DB güncellenemedi. '
+                                'Tekrar Gönder wizard\'ını veya cron sorgusunu kullanın.'
+                            ) % inv_uuid,
+                        })
+                except Exception:
+                    pass
+                raise
 
         except Exception as e:
             # Sovos hatası: numara serbest bırak + Odoo'yu draft'a döndür.
@@ -418,12 +429,94 @@ class AccountMove(models.Model):
         """
         Hata durumunda rezerve numarayı serbest bırakır.
         Sequence counter geri alınamaz — numara boşluk oluşturur (normaldir).
+
+        Not: Çağıran akış ardından UserError fırlattığı için bu yazım transaction
+        ile birlikte geri alınır; kalıcı sonuç faturanın rezervasyon öncesi haline
+        (numarasız taslak) dönmesidir. Buradaki asıl iz log kaydıdır.
         """
         self.write({'x_number_status': 'released'})
         _logger.warning(
             'e-Fatura numara serbest bırakıldı (boşluk oluştu): %s',
             self.x_reserved_number,
         )
+
+    # ═══════════════════════════════════════════════════════════════════
+    # XML Attachment Yardımcıları (Madde 10)
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _attach_validation_xml(self, xml_bytes, layer):
+        """
+        Validasyon hatası oluştuğunda UBL XML'ini ir.attachment olarak kaydeder
+        ve chatter'a indirme bağlantısı içeren bir mesaj yazar.
+
+        Neden ir.attachment?
+            - Kullanıcı XML'i tarayıcıdan indirebilir, kopyalamak zorunda kalmaz.
+            - DB'de düz metin olarak şişmez (binary blob olarak saklanır).
+            - Her hata için ayrı dosya: geçmiş hataları karşılaştırabilirsiniz.
+
+        Parametreler:
+            xml_bytes (bytes): Hatalı UBL XML içeriği
+            layer     (str):   Hata katmanı ('XSD' veya 'SCHEMATRON')
+        """
+        import base64
+        try:
+            fname = '%s_validasyon_hatasi_%s.xml' % (
+                self.name or str(self.id), layer.lower()
+            )
+            attachment = self.env['ir.attachment'].create({
+                'name':      fname,
+                'type':      'binary',
+                'datas':     base64.b64encode(xml_bytes).decode(),
+                'res_model': self._name,
+                'res_id':    self.id,
+                'mimetype':  'application/xml',
+            })
+            self.message_post(
+                body=_(
+                    '<b>⚠ UBL Validasyon Hatası [%s]</b><br/>'
+                    'Hatalı XML dosyası ek olarak kaydedildi: '
+                    '<a href="/web/content/%d?download=true">%s</a>'
+                ) % (layer, attachment.id, fname),
+                message_type='comment',
+                subtype_xmlid='mail.mt_note',
+            )
+        except Exception as e:
+            _logger.warning('Validasyon XML attachment oluşturulamadı: %s', e)
+
+    def _attach_preview_xml(self, xml_bytes, temp_uuid, scenario):
+        """
+        Önizleme XML'ini ir.attachment olarak kaydeder.
+
+        Neden?
+            - Önizleme her çalıştığında yeni attachment oluşturur (UUID benzersiz).
+            - Kullanıcı XML'i doğrudan indirebilir; HTML içine gömmek gerekmez.
+            - Eski önizleme attachmentlarını temizlemek için:
+              ir.attachment.search([('res_model','=','account.move'),
+                                    ('res_id','=',self.id),
+                                    ('name','like','_onizleme_')]).unlink()
+
+        Parametreler:
+            xml_bytes  (bytes): UBL XML içeriği
+            temp_uuid  (str):   Geçici UUID (fatura henüz gönderilmedi)
+            scenario   (str):   TICARIFATURA / TEMEL vb.
+
+        Dönüş: ir.attachment kaydı veya None (hata durumunda)
+        """
+        import base64
+        try:
+            fname = '%s_onizleme_%s.xml' % (self.name or str(self.id), scenario)
+            attachment = self.env['ir.attachment'].create({
+                'name':      fname,
+                'type':      'binary',
+                'datas':     base64.b64encode(xml_bytes).decode(),
+                'res_model': self._name,
+                'res_id':    self.id,
+                'mimetype':  'application/xml',
+            })
+            return attachment
+        except Exception as e:
+            _logger.warning('Önizleme XML attachment oluşturulamadı: %s', e)
+            return None
 
     def _set_error(self, msg):
         """x_efatura_status=error + hata mesajı yazar."""
@@ -539,13 +632,19 @@ class AccountMove(models.Model):
                 '<strong>⚠ Validasyon Hatası [%s]:</strong><ul>%s</ul></div>'
             ) % (layer, err_lines)
 
+        # Madde 10: XML'i ir.attachment olarak kaydet; kullanıcı indirebilir, DB şişmez.
+        attachment = self._attach_preview_xml(xml_bytes, temp_uuid, scenario)
+        download_url = '/web/content/%d?download=true' % attachment.id if attachment else '#'
+
         xml_preview = xml_bytes.decode('utf-8')[:3000] + ('...' if len(xml_bytes) > 3000 else '')
         html = (
             '<h3>e-Fatura Önizleme</h3>%s'
             '<p><strong>UUID:</strong> %s</p>'
             '<p><strong>Senaryo:</strong> %s | <strong>Tür:</strong> %s</p>'
+            '<p><a href="%s" target="_blank">&#x2B73; XML İndir (%s.xml)</a></p>'
             '<pre style="background:#f5f5f5;padding:8px;overflow:auto;max-height:400px;">%s</pre>'
-        ) % (validation_html, temp_uuid, scenario, efatura_type, xml_preview)
+        ) % (validation_html, temp_uuid, scenario, efatura_type,
+             download_url, self.name or temp_uuid, xml_preview)
 
         return {
             'type': 'ir.actions.act_url',
@@ -636,9 +735,9 @@ class AccountMove(models.Model):
         elif code in GIB_CANCEL_AND_NEW:
             # 1104, 1163 — İçerik hatası; iptal + yeni fatura gerekli
             self._set_error(user_msg)
-            if code == 1104:
-                # 1104: atomik numara mekanizmasına rağmen başka kanaldan numara çakışması
-                self._notify_admin_gib_error(code, user_msg)
+            # 1104: atomik numaraya rağmen başka kanaldan numara çakışması
+            # 1163: mükerrer UUID — UUID üretiminde sorun; ikisi de manuel inceleme ister
+            self._notify_admin_gib_error(code, user_msg)
 
         elif code in GIB_SOVOS_SUPPORT:
             # 1161, 1171, 1172 — İmza / yetki; Sovos teknik destek
@@ -696,6 +795,18 @@ class AccountMove(models.Model):
             'type':      'ir.actions.act_window',
             'name':      _('Fatura İptal'),
             'res_model': 'sovos.cancel.invoice.wizard',
+            'view_mode': 'form',
+            'target':    'new',
+            'context':   {'default_invoice_id': self.id},
+        }
+
+    def action_open_incoming_match_wizard(self):
+        """Gelen fatura eşleme wizard'ını açar (pending/review durumlar için)."""
+        self.ensure_one()
+        return {
+            'type':      'ir.actions.act_window',
+            'name':      _('Gelen Fatura Eşleme'),
+            'res_model': 'sovos.incoming.match.wizard',
             'view_mode': 'form',
             'target':    'new',
             'context':   {'default_invoice_id': self.id},

@@ -175,7 +175,7 @@ class TestPurchaseAccountingEntry(SovosTestCommon):
         """Alış faturası oluşturur."""
         account_expense = self.env['account.account'].search([
             ('account_type', 'in', ('expense', 'expense_depreciation')),
-            ('company_id', '=', self.company.id),
+            ('company_ids', 'in', self.company.id),
         ], limit=1)
 
         if not account_expense:
@@ -311,7 +311,7 @@ class TestPurchaseAccountingEntry(SovosTestCommon):
 
         account_expense = self.env['account.account'].search([
             ('account_type', 'in', ('expense', 'expense_depreciation')),
-            ('company_id', '=', self.company.id),
+            ('company_ids', 'in', self.company.id),
         ], limit=1)
 
         purchase_journal = self.env['account.journal'].search([
@@ -346,7 +346,7 @@ class TestPurchaseAccountingEntry(SovosTestCommon):
         inv = self._create_purchase_invoice()
 
         # e-Fatura servislerinin çağrılmadığını doğrula
-        with patch('l10n_tr_sovos_efatura.services.sovos_invoice_service'
+        with patch('odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
                    '.SovosInvoiceService.send_ubl') as mock_send:
             inv.action_post()
             mock_send.assert_not_called()
@@ -361,7 +361,7 @@ class TestPurchaseAccountingEntry(SovosTestCommon):
         """
         account_expense = self.env['account.account'].search([
             ('account_type', 'in', ('expense', 'expense_depreciation')),
-            ('company_id', '=', self.company.id),
+            ('company_ids', 'in', self.company.id),
         ], limit=1)
 
         purchase_journal = self.env['account.journal'].search([

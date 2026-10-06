@@ -2,24 +2,17 @@
 """
 sovos_sync.py — Sovos Arka Plan Görevleri (Cron İşleri)
 =========================================================
-Bu model, Odoo'nun zamanlı görev sistemi (ir.cron) tarafından düzenli
-aralıklarla çağrılan senkronizasyon işlevlerini içerir.
+Tüm cron görevlerini içerir.
 
-Tüm cron görevleri data/ir_cron_data.xml dosyasında tanımlanmıştır.
-
-Görev Özeti:
-  cron_sync_incoming_invoices  → Gelen faturaları Sovos'tan çeker (15 dk)
-  cron_sync_efatura_status     → e-Fatura GİB durum takibi (30 dk)
-  cron_sync_earsiv_status      → e-Arşiv durum takibi (30 dk, ayrı servis)
-  cron_sync_inv_responses      → TICARIFATURA KABUL/RED yanıtları (1 saat)
-  cron_check_8day_warnings     → 8 gün yanıt uyarısı (günlük)
-  cron_refresh_vkn_cache       → Partner VKN cache yenileme (günlük)
-
-Multi-company Desteği:
-  _cron_run_for_all_companies() tüm görevlerde kullanılır.
-  Sovos hesabı olan her şirket için ilgili görevi ayrı ayrı çalıştırır.
-  Bir şirkette hata olursa diğerleri etkilenmez (try/except + continue).
+MADDE 5 GÜNCELLEMESİ — _sync_incoming_for_company() artık:
+  FAZ 1: Partner VKN kesin eşleme + fuzzy match
+  FAZ 2: UBL XML tam parse (satır detayları dahil)
+  FAZ 2: Öğrenen tablo ile ürün eşleme
+  FAZ 3: difflib benzerlik + kural motoru
+  FAZ 3: Düşük güvenli eşlemeler → bekletme kuyruğu (x_efatura_match_status)
+  FAZ 3: Toplu onay wizard'ı ile kullanıcı onayı
 """
+import base64
 import logging
 from datetime import date, timedelta
 
@@ -29,8 +22,6 @@ _logger = logging.getLogger(__name__)
 
 
 class SovosSync(models.Model):
-    # Tamamen yeni bir model; mevcut modeli genişletmiyor.
-    # _name: Odoo veritabanında bu adla tablo oluşturur (sovos_sync).
     _name = 'sovos.sync'
     _description = 'Sovos Senkronizasyon Görevleri'
 
@@ -38,225 +29,294 @@ class SovosSync(models.Model):
 
     @api.model
     def _cron_run_for_all_companies(self, task_fn_name):
-        """
-        Tüm şirketler için belirtilen görevi çalıştırır.
-
-        Parametreler:
-            task_fn_name (str): Bu sınıftaki metod adı (ör: '_sync_efatura_status_for_company')
-
-        Neden string kullanılıyor?
-            cron XML dosyasından doğrudan method ismi geçirilemiyor;
-            string alıp getattr ile dinamik çağrı yapıyoruz.
-
-        Hata yönetimi:
-            Bir şirkette hata olursa: loglanır + admin bildirilir + sonraki şirkete geçilir.
-            Bu sayede bir şirketin sorunu diğer şirketlerin cron'unu durdurmaz.
-        """
-        # Sovos hesabı tanımlı olan şirketleri al
+        """Tüm şirketler için belirtilen görevi çalıştırır."""
         companies = self.env['res.company'].search([
             ('x_sovos_invoice_user', '!=', False)
         ])
-
-        # getattr: string metod adından fonksiyon referansı alır
-        # Örnek: getattr(self, '_sync_efatura_status_for_company')
-        task_fn = getattr(self, task_fn_name)
-
         for company in companies:
             try:
-                task_fn(company)
+                # with_company: görev, env.company = ilgili şirket olacak şekilde çalışır
+                # (oluşturulan kayıtlar / varsayılan dergi-hesaplar doğru şirkete düşer)
+                getattr(self.with_company(company), task_fn_name)(company)
             except Exception as e:
                 _logger.error('[%s] %s hatası: %s', company.name, task_fn_name, e)
-                # Hata oluştu ama diğer şirketler için devam et
                 self._notify_admin(company, task_fn_name, str(e))
-                continue  # Bir sonraki şirkete geç
+                continue
 
     def _notify_admin(self, company, task_name, error_msg):
-        """
-        Cron hatalarında sistem yöneticisine Odoo iç bildirimi ve e-posta gönderir.
-
-        İki kanaldan bildirim:
-          1. Odoo mail.message → şirket kaydı üzerine not olarak görünür
-          2. E-posta → x_sovos_admin_email doluysa harici bildirim
-
-        Hata toleransı:
-            Bildirim gönderme de başarısız olursa sadece loglanır;
-            exception fırlatılmaz (sonsuz hata döngüsü önlenir).
-        """
+        """Cron hatalarında admin bildirim gönderir."""
         try:
-            # base.user_admin: Odoo'nun varsayılan sistem yöneticisi
             admin = self.env.ref('base.user_admin')
-
-            # mail.message: Odoo chatter sistemine not ekler
             self.env['mail.message'].create({
-                'model': 'res.company',         # Nereye ekleneceği (şirket kaydı)
-                'res_id': company.id,            # Hangi şirketin üzerine
-                'message_type': 'comment',       # Yorum türünde not
-                'subtype_id': self.env.ref('mail.mt_note').id,  # Not alt türü (log)
+                'model': 'res.company',
+                'res_id': company.id,
+                'message_type': 'comment',
+                'subtype_id': self.env.ref('mail.mt_note').id,
                 'body': '<p><strong>⚠ e-Fatura Cron Hatası — %s</strong><br/>%s: %s</p>' % (
                     company.name, task_name, error_msg
                 ),
-                'partner_ids': [(4, admin.partner_id.id)],  # (4, id) = many2many'e ekle
+                'partner_ids': [(4, admin.partner_id.id)],
                 'author_id': self.env.ref('base.user_root').partner_id.id,
             })
-
-            # Harici e-posta bildirimi (admin e-postası tanımlıysa)
             if company.x_sovos_admin_email:
                 self.env['mail.mail'].create({
                     'subject': '[Odoo e-Fatura] Cron Hatası — %s' % company.name,
                     'body_html': '<p>%s cron görevi başarısız: %s</p>' % (task_name, error_msg),
                     'email_to': company.x_sovos_admin_email,
                 }).send()
-
         except Exception as e:
-            # Bildirim göndermek de başarısız oldu — sadece logla, exception fırlatma
             _logger.error('Admin bildirimi gönderilemedi: %s', e)
 
-    # ── Gelen Fatura Senkronizasyonu (15 dk) ──────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════
+    # MADDE 5: Gelen Fatura Senkronizasyonu (15 dk)
+    # FAZ 1 + 2 + 3 tam implementasyon
+    # ══════════════════════════════════════════════════════════════════════
 
     @api.model
     def cron_sync_incoming_invoices(self):
-        """
-        Cron entry point — gelen faturaları senkronize eder.
-        ir_cron_data.xml'de 15 dakikada bir çalışmak üzere tanımlanmıştır.
-
-        @api.model: self'in belirli bir kaydı temsil etmediği, model metodlarında kullanılır.
-        """
+        """Cron entry point — gelen faturaları senkronize eder (15 dk)."""
         self._cron_run_for_all_companies('_sync_incoming_for_company')
 
     def _sync_incoming_for_company(self, company):
         """
-        Tek şirket için gelen faturaları Sovos'tan çekip Odoo'ya kaydeder.
+        FAZ 1 + 2 + 3: Gelen faturaları Sovos'tan çek, parse et, eşle, kaydet.
 
-        Duplikasyon önlemi:
-            UUID zaten varsa fatura tekrar oluşturulmaz.
-            Bu sayede cron her çalıştığında aynı fatura ikinci kez eklenmez.
-
-        Limitasyon:
-            Gelen fatura satır detayları (kalemler) şu an alınmıyor; sadece başlık bilgisi.
-            Tam implementasyon için Sovos'tan UBL XML çekilip parse edilmesi gerekir.
+        Akış:
+          1. Sovos'tan gelen fatura listesini al
+          2. Her fatura için UUID duplikasyon kontrolü
+          3. UBL XML'ini Sovos'tan tam çek (FAZ 2)
+          4. parse et (UblParser)
+          5. Partner eşle (FAZ 1 + FAZ 3 fuzzy)
+          6. Fatura başlığı oluştur
+          7. Satırları eşle ve oluştur (FAZ 2 + FAZ 3)
+          8. Düşük güvenli satırlar → bekletme kuyruğu (FAZ 3)
         """
         from ..services.sovos_invoice_service import SovosInvoiceService
-        svc = SovosInvoiceService(company)
+        from ..services.ubl_parser import UblParser
+        from ..services.incoming_matcher import IncomingMatcher
 
-        # Sovos'tan gelen faturaların listesini al
-        invoices = svc.get_inbound_list()
+        svc     = SovosInvoiceService(company)
+        parser  = UblParser()
+        matcher = IncomingMatcher(self.env)
 
-        # with_company(company): Çok şirketli ortamda doğru şirket bağlamında çalıştır
         AccountMove = self.env['account.move'].with_company(company)
 
-        for inv_data in invoices:
-            uuid = inv_data.get('uuid')
+        # 1. Gelen fatura listesi
+        invoice_list = svc.get_inbound_list()
+
+        for inv_header in invoice_list:
+            uuid = inv_header.get('uuid')
             if not uuid:
-                continue  # UUID yoksa bu kaydı atla
+                continue
 
-            # Aynı UUID ile daha önce oluşturulmuş alış faturası var mı?
-            existing = AccountMove.search([
+            # 2. Duplikasyon kontrolü
+            if AccountMove.search([
                 ('x_sovos_uuid', '=', uuid),
-                ('move_type', '=', 'in_invoice'),  # in_invoice = alış faturası
-            ], limit=1)
+                ('move_type', '=', 'in_invoice'),
+            ], limit=1):
+                continue  # Zaten var
 
-            if existing:
-                continue  # Zaten var → atla (duplikasyon önlemi)
+            try:
+                self._process_single_incoming(
+                    uuid, inv_header, company, svc, parser, matcher, AccountMove
+                )
+            except Exception as e:
+                _logger.error('Gelen fatura işlenemedi (UUID=%s): %s', uuid, e)
+                continue  # Diğer faturalar etkilenmesin
 
-            # Gönderici VKN ile partner bul
-            partner = self._find_partner_by_vkn(inv_data.get('sender_vkn'))
+    def _process_single_incoming(self, uuid, inv_header, company, svc, parser, matcher, AccountMove):
+        """Tek bir gelen faturayı işle."""
 
-            # Yeni alış faturası oluştur (taslak olarak)
-            AccountMove.create({
-                'move_type': 'in_invoice',                   # Alış faturası
-                'partner_id': partner.id if partner else False,
-                'invoice_date': inv_data.get('invoice_date'),
-                'x_sovos_uuid': uuid,
-                'x_efatura_status': 'accepted',              # Gelen fatura zaten kabul edilmiş
-                'x_efatura_type': 'efatura',
-            })
+        # 3. UBL XML'ini Sovos'tan tam çek (FAZ 2)
+        try:
+            xml_bytes = svc.get_invoice_ubl(uuid)
+        except Exception as e:
+            _logger.warning('UBL çekilemedi (UUID=%s): %s — başlık bilgisi kullanılır', uuid, e)
+            xml_bytes = None
 
-    def _find_partner_by_vkn(self, vkn):
+        # 4. Parse et
+        parsed = None
+        if xml_bytes:
+            try:
+                parsed = parser.parse(xml_bytes)
+            except Exception as e:
+                _logger.warning('UBL parse hatası (UUID=%s): %s — başlık bilgisi kullanılır', uuid, e)
+
+        # Parsed yoksa başlık verisini kullan (geriye dönük uyumluluk)
+        sender_vkn  = (parsed or inv_header).get('sender_vkn', '') or inv_header.get('sender_vkn', '')
+        sender_name = (parsed or {}).get('sender_name', '')
+        inv_date    = (parsed or inv_header).get('invoice_date') or inv_header.get('invoice_date')
+
+        # 5. Partner eşle (FAZ 1 + FAZ 3)
+        partner, p_confidence, p_source = matcher.find_partner(sender_vkn, sender_name)
+
+        # Eşleme durumu belirleme
+        # Yüksek güven → matched, Orta → review, Düşük/Yok → pending
+        if p_confidence >= 0.85 and parsed:
+            match_status = 'matched_auto'
+        elif p_confidence >= 0.60:
+            match_status = 'review'
+        else:
+            match_status = 'pending'
+
+        # 6. Fatura başlığı oluştur
+        move_vals = {
+            'move_type':           'in_invoice',
+            'partner_id':          partner.id if partner else False,
+            'invoice_date':        inv_date,
+            'currency_id':         self._find_currency(parsed, company),
+            'x_sovos_uuid':        uuid,
+            'x_efatura_status':    'accepted',
+            'x_efatura_type':      'efatura',
+            'x_efatura_match_status': match_status,
+        }
+
+        # Notları müşteri notuna ekle
+        if parsed and parsed.get('notes'):
+            move_vals['narration'] = '\n'.join(parsed['notes'])
+
+        move = AccountMove.create(move_vals)
+
+        # 7. Satırları oluştur (FAZ 2 + FAZ 3) — sadece UBL parse başarılıysa
+        if parsed and parsed.get('lines'):
+            has_unmatched = self._create_invoice_lines(
+                move, parsed['lines'], partner, company, matcher
+            )
+            # 8. Eşleşemeyen satır varsa bekletme kuyruğuna al (FAZ 3)
+            if has_unmatched and match_status not in ('pending',):
+                move.write({'x_efatura_match_status': 'review'})
+
+        _logger.info(
+            'Gelen fatura oluşturuldu: UUID=%s partner=%s status=%s satır=%d',
+            uuid,
+            partner.name if partner else 'BULUNAMADI',
+            match_status,
+            len(parsed['lines']) if parsed else 0,
+        )
+
+    def _create_invoice_lines(self, move, lines, partner, company, matcher):
         """
-        VKN/TCKN ile Odoo'daki eşleşen partneri bulur.
-
-        Returns: res.partner kaydı veya False (bulunamazsa)
-        Kullanım: Gelen fatura için gönderici firma tespiti.
+        Fatura kalemlerini oluşturur.
+        Returns: bool — eşleşemeyen satır var mı?
         """
-        if not vkn:
-            return False
-        # limit=1: Birden fazla partner aynı VKN ile kayıtlıysa ilkini al
-        return self.env['res.partner'].search([('vat', '=', vkn)], limit=1)
+        has_unmatched = False
+        supplier_id = partner.id if partner else False
+
+        for line_data in lines:
+            description = line_data.get('description', '')
+            ubl_code    = line_data.get('ubl_code', '')
+            quantity    = line_data.get('quantity', 1.0)
+            unit_price  = line_data.get('unit_price', 0.0)
+            tax_percent = line_data.get('tax_percent', 0.0)
+            uom_code    = line_data.get('uom_code', 'C62')
+
+            # Ürün eşle (FAZ 2 + FAZ 3)
+            product_match = matcher.find_product(supplier_id, description, ubl_code)
+            product  = product_match.get('product')
+            account  = product_match.get('account')
+            tax_rec  = product_match.get('tax_ids')
+            uom_rec  = product_match.get('uom')
+            conf     = product_match.get('confidence', 0.0)
+            source   = product_match.get('source', 'none')
+
+            # Vergi bul
+            if not tax_rec:
+                tax_rec = matcher.find_tax(tax_percent, company)
+
+            # Birim bul
+            if not uom_rec:
+                uom_rec = matcher.find_uom(uom_code)
+
+            # Hesap bul (ürün eşleşemediyse genel gider)
+            if not account and not product:
+                account = matcher.find_expense_account(company)
+                has_unmatched = True
+
+            # Satır oluştur
+            line_vals = {
+                'move_id':     move.id,
+                'name':        description or _('e-Fatura Kalemi'),
+                'quantity':    quantity,
+                'price_unit':  unit_price,
+            }
+            if product:
+                line_vals['product_id'] = product.id
+            if account:
+                line_vals['account_id'] = account.id
+            if tax_rec:
+                tax_list = tax_rec if hasattr(tax_rec, '__iter__') else [tax_rec]
+                line_vals['tax_ids'] = [(6, 0, [t.id for t in tax_list if t])]
+            if uom_rec:
+                line_vals['product_uom_id'] = uom_rec.id
+
+            # Eşleme meta bilgisini nota ekle (FAZ 3 — kullanıcı görebilsin)
+            if conf < 1.0 or source not in ('learned_mapping', 'ubl_code'):
+                note = _('e-Fatura: %s | Eşleme: %s (%.0f%%)') % (description, source, conf * 100)
+                line_vals['name'] = ('%s\n[%s]' % (description, note)) if conf < MATCH_AUTO_THRESHOLD else description
+
+            self.env['account.move.line'].create(line_vals)
+
+        return has_unmatched
+
+    def _find_currency(self, parsed, company):
+        """UBL'deki para birimi koduna göre Odoo currency bul."""
+        if not parsed:
+            return company.currency_id.id
+        currency_code = parsed.get('currency', 'TRY')
+        currency = self.env['res.currency'].search(
+            [('name', '=', currency_code)], limit=1
+        )
+        return currency.id if currency else company.currency_id.id
 
     # ── e-Fatura GİB Durum Takibi (30 dk) ────────────────────────────────
 
     @api.model
     def cron_sync_efatura_status(self):
-        """
-        Cron entry point — e-Fatura GİB durum takibi.
-        Gönderilmiş ('sent', 'sending') e-Faturaların GİB durumunu Sovos'tan sorgular.
-        ir_cron_data.xml'de 30 dakikada bir çalışır.
-        """
+        """e-Fatura GİB durum takibi (30 dk)."""
         self._cron_run_for_all_companies('_sync_efatura_status_for_company')
 
     def _sync_efatura_status_for_company(self, company):
-        """
-        Tek şirket için beklemedeki e-Faturaların durumlarını günceller.
-
-        Filtre: sent veya sending + efatura + envelope_uuid dolu
-        Neden envelope_uuid? GetEnvelopeStatus çağrısı bu UUID'ye ihtiyaç duyar.
-
-        Hata toleransı:
-            Tek bir faturanın sorgusu başarısız olursa diğerleri etkilenmez.
-            Örnek: Bir fatura için Sovos zaman aşımı → sadece o fatura atlanır.
-        """
         from ..services.sovos_invoice_service import SovosInvoiceService
+        from datetime import datetime, timedelta
         svc = SovosInvoiceService(company)
 
-        # Durumu hâlâ belirsiz olan e-Faturaları bul
+        # x_gib_admin_notified=True olan faturalar (1215 durumu) 4 saatte bir sorgulanır.
+        # Neden: 1215 alan fatura 'sent' kalır (cron takip etsin diye — DÜZELTME #1).
+        # Her 30 dakikada sorgulamak Sovos rate-limit riskini artırır (SSS S5).
+        # 4 saatlik pencere: write_date < (şimdi - 4 saat) koşuluyla sağlanır;
+        # cron son 4 saatte sorguladıysa write_date yenilenir, tekrar gelene kadar atlanır.
+        threshold_1215 = datetime.now() - timedelta(hours=4)
+
         pending = self.env['account.move'].with_company(company).search([
             ('x_efatura_status', 'in', ('sent', 'sending')),
             ('x_efatura_type', '=', 'efatura'),
-            ('x_sovos_envelope_uuid', '!=', False),  # Envelope UUID olmalı
+            ('x_sovos_envelope_uuid', '!=', False),
+            '|',
+            ('x_gib_admin_notified', '=', False),        # Normal faturalar: her 30 dk
+            ('write_date', '<', threshold_1215),          # 1215 faturalar: 4 saatte bir
         ])
-
         for move in pending:
             try:
-                # Sovos'tan durum kodu al (ör: 1300, 1215, 1104 vb.)
                 status_code, status_msg = svc.get_envelope_status(move.x_sovos_envelope_uuid)
-                # Koda göre Odoo durumunu güncelle
                 move._process_gib_status(status_code, status_msg)
             except Exception as e:
-                # Bu fatura için sorgu başarısız → logla, sonrakine geç
                 _logger.warning('Durum sorgusu başarısız (%s): %s', move.x_sovos_uuid, e)
 
-    # ── e-Arşiv Durum Takibi (30 dk — AYRI SERVİS) ────────────────────────
+    # ── e-Arşiv Durum Takibi (30 dk) ─────────────────────────────────────
 
     @api.model
     def cron_sync_earsiv_status(self):
-        """
-        Cron entry point — e-Arşiv durum takibi.
-        e-Arşiv faturalar ArchiveService üzerinden sorgulanır (InvoiceService değil).
-        ir_cron_data.xml'de 30 dakikada bir çalışır.
-
-        Neden ayrı cron?
-            e-Fatura InvoiceService.GetEnvelopeStatus kullanırken
-            e-Arşiv ArchiveService.GetInvoiceStatus kullanır.
-            Her ikisi farklı SOAP endpoint'leridir.
-        """
+        """e-Arşiv durum takibi (30 dk)."""
         self._cron_run_for_all_companies('_sync_earsiv_status_for_company')
 
     def _sync_earsiv_status_for_company(self, company):
-        """
-        Tek şirket için beklemedeki e-Arşiv faturalarının durumlarını günceller.
-
-        Filtre: sent veya sending + earsiv + sovos_uuid dolu
-        NOT: e-Arşiv'de envelope_uuid yoktur; x_sovos_uuid ile sorgu yapılır.
-        """
         from ..services.sovos_archive_service import SovosArchiveService
         svc = SovosArchiveService(company)
-
         pending = self.env['account.move'].with_company(company).search([
             ('x_efatura_status', 'in', ('sent', 'sending')),
             ('x_efatura_type', '=', 'earsiv'),
             ('x_sovos_uuid', '!=', False),
         ])
-
         for move in pending:
             try:
                 status_code, status_msg = svc.get_invoice_status(move.x_sovos_uuid)
@@ -264,133 +324,67 @@ class SovosSync(models.Model):
             except Exception as e:
                 _logger.warning('e-Arşiv durum sorgusu başarısız (%s): %s', move.x_sovos_uuid, e)
 
-    # ── TICARIFATURA KABUL/RED Yanıt Takibi (1 saat) ──────────────────────
+    # ── TICARIFATURA KABUL/RED (1 saat) ──────────────────────────────────
 
     @api.model
     def cron_sync_inv_responses(self):
-        """
-        Cron entry point — TICARIFATURA ApplicationResponse takibi.
-        GİB'e kayıtlı alıcı firmalar 8 gün içinde KABUL veya RED yanıtı gönderebilir.
-        Bu yanıtlar Sovos'tan periyodik olarak sorgulanır (1 saatte bir).
-        """
+        """TICARIFATURA ApplicationResponse takibi (1 saat)."""
         self._cron_run_for_all_companies('_sync_inv_responses_for_company')
 
     def _sync_inv_responses_for_company(self, company):
-        """
-        TICARIFATURA KABUL/RED yanıtlarını Sovos'tan alır ve ilgili faturalara işler.
-
-        GetInvResponses OUTBOUND: Bizim gönderdiklerimize gelen yanıtları alır.
-        UUID eşleştirmesi ile hangi faturaya ait olduğu belirlenir.
-        Yanıt kodu: 1305 = Kabul, 1310 = Red (constants.py'de tanımlı)
-        """
         from ..services.sovos_invoice_service import SovosInvoiceService
         svc = SovosInvoiceService(company)
-
-        # Sovos'tan bekleyen tüm yanıtları al
         responses = svc.get_inv_responses_outbound()
-
         for resp in responses:
             uuid = resp.get('uuid')
             if not uuid:
                 continue
-
-            # UUID ile Odoo'daki faturayı bul
-            move = self.env['account.move'].with_company(company).search([
-                ('x_sovos_uuid', '=', uuid)
-            ], limit=1)
-
+            move = self.env['account.move'].with_company(company).search(
+                [('x_sovos_uuid', '=', uuid)], limit=1
+            )
             if move:
-                # İlgili durum kodunu işle (1305 veya 1310)
                 move._process_gib_status(resp.get('status_code'))
 
-    # ── 8 Gün Yanıt Süresi Uyarısı (Günlük) ──────────────────────────────
+    # ── 8 Gün Uyarısı (Günlük) ───────────────────────────────────────────
 
     @api.model
     def cron_check_8day_warnings(self):
-        """
-        Cron entry point — 8 günlük TICARIFATURA yanıt süresi uyarısı.
-        Süresi dolmak üzere olan faturalar için chatter'a uyarı notu eklenir.
-        ir_cron_data.xml'de günlük çalışır.
-
-        GİB Kuralı: TICARIFATURA gönderildiğinde alıcının 8 gün içinde
-        yanıt vermesi gerekir. Süre dolarsa fatura hukuki olarak geçerli sayılır
-        ancak sistem üzerinde takip kaybı oluşabilir.
-        """
+        """8 günlük TICARIFATURA yanıt süresi uyarısı (günlük)."""
         self._cron_run_for_all_companies('_check_8day_for_company')
 
     def _check_8day_for_company(self, company):
-        """
-        TICARIFATURA'larda 8 günlük süresinin dolmasına 1 gün kalan faturaları bulur
-        ve chatter'a uyarı mesajı ekler.
-
-        Neden 'tomorrow' (yarın) ile karşılaştırma?
-            Bugün son gün olan faturalar için yarın çok geç olur.
-            1 gün önceden uyararak hesap yöneticisine müdahale şansı verilir.
-
-        Not: x_show_8day_warning alanı store=False (computed) olduğundan
-        domain filtresinde kullanılamaz; burada manuel tarih hesabı yapılır.
-        """
         tomorrow = date.today() + timedelta(days=1)
-
-        # Yanıt beklenen ve süresi yaklaşan TICARIFATURA'ları bul
         expiring = self.env['account.move'].with_company(company).search([
             ('x_inv_response_status', '=', 'beklemede'),
-            ('x_inv_response_deadline', '<=', tomorrow),  # Yarın veya daha önce doluyor
+            ('x_inv_response_deadline', '<=', tomorrow),
             ('x_efatura_scenario', '=', 'TICARIFATURA'),
         ])
-
         for move in expiring:
-            _logger.warning(
-                '8 gün uyarısı: %s (son gün: %s)',
-                move.name,
-                move.x_inv_response_deadline
-            )
-            # Fatura chatter'ına (log) uyarı notu ekle
-            # message_post: mail.thread mixin'den gelir (account.move bunu inherit eder)
+            _logger.warning('8 gün uyarısı: %s (son gün: %s)', move.name, move.x_inv_response_deadline)
             move.message_post(
                 body=_('⚠ TICARIFATURA yanıt süresi dolmak üzere! Son gün: %s') % move.x_inv_response_deadline,
-                subtype_id=self.env.ref('mail.mt_note').id,  # mt_note = iç not (harici gönderilmez)
+                subtype_id=self.env.ref('mail.mt_note').id,
             )
 
-    # ── VKN Cache Güncelleme (Günlük) ─────────────────────────────────────
+    # ── VKN Cache Güncelleme (Günlük) ────────────────────────────────────
 
     @api.model
     def cron_refresh_vkn_cache(self):
-        """
-        Cron entry point — eski VKN cache'lerini yeniler.
-        30 günden eski veya hiç güncellenmemiş partner VKN bilgilerini Sovos'tan sorgular.
-        ir_cron_data.xml'de günlük çalışır.
-
-        Neden toplu yenileme?
-            Fatura gönderimi sırasında bireysel yenileme de yapılır (res_partner.py).
-            Bu cron ise sadece müşteri olan ve VKN'i olan tüm partnerleri günlük tarar.
-            Böylece fatura anında gecikme yaşanmadan cache her zaman taze olur.
-        """
+        """Eski VKN cache'lerini yeniler (günlük)."""
         self._cron_run_for_all_companies('_refresh_vkn_for_company')
 
     def _refresh_vkn_for_company(self, company):
-        """
-        Tek şirket için eski/eksik VKN cache'lerini Sovos'tan yeniler.
-
-        Filtre mantığı:
-          - x_efatura_type_updated < stale_date VEYA güncelleme tarihi hiç yok
-          - VKN girilmiş olmalı (vat != False)
-          - Müşteri olmalı (customer_rank > 0) — tedarikçileri yenilemeye gerek yok
-
-        NOT: Bu işlem çok sayıda Sovos API çağrısı yapabilir.
-        Büyük partner listelerinde Sovos rate limit'ine dikkat edilmelidir.
-        """
-        stale_date = date.today() - timedelta(days=30)  # 30 gün öncesi
-
-        # | → Odoo domain'de OR operatörü (ön ek notasyonu)
+        stale_date = date.today() - timedelta(days=30)
         partners = self.env['res.partner'].search([
             '|',
-            ('x_efatura_type_updated', '<', stale_date),   # 30+ gün önce güncellendi
-            ('x_efatura_type_updated', '=', False),         # Hiç güncellenmemiş
-            ('vat', '!=', False),                            # VKN girilmiş olmalı
-            ('customer_rank', '>', 0),                       # Müşteri olmalı
+            ('x_efatura_type_updated', '<', stale_date),
+            ('x_efatura_type_updated', '=', False),
+            ('vat', '!=', False),
+            ('customer_rank', '>', 0),
         ])
-
         for partner in partners:
-            # Her partner için Sovos'tan VKN sorgusu yap ve cache güncelle
             partner.refresh_efatura_type(company)
+
+
+# Sabit: otomatik eşleme eşiği (incoming_matcher.py ile tutarlı)
+MATCH_AUTO_THRESHOLD = 0.85

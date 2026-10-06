@@ -259,7 +259,7 @@ class TestEFaturaPost(SovosTestCommon):
         with self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
              patch(
-                 'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+                 'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
                  '.SovosInvoiceService.send_ubl',
                  side_effect=capture_status,   # return_value değil side_effect!
              ):
@@ -412,7 +412,7 @@ class TestBulkSend(SovosTestCommon):
         with self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
              patch(
-                 'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+                 'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
                  '.SovosInvoiceService.send_ubl',
                  side_effect=track_order,
              ):
@@ -441,7 +441,7 @@ class TestBulkSend(SovosTestCommon):
         with self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
              self._mock_sovos_invoice_success(), \
-             patch('l10n_tr_sovos_efatura.models.account_move.time.sleep') as mock_sleep:
+             patch('odoo.addons.l10n_tr_sovos_efatura.models.account_move.time.sleep') as mock_sleep:
             inv.action_send_efatura_bulk()
 
         # assert_called_with(0.5): tam olarak 0.5 argümanı ile çağrılmalı
@@ -522,7 +522,7 @@ class TestBulkSend(SovosTestCommon):
         with self._mock_ubl_builder(), \
              self._mock_validator_valid(), \
              patch(
-                 'l10n_tr_sovos_efatura.services.sovos_invoice_service'
+                 'odoo.addons.l10n_tr_sovos_efatura.services.sovos_invoice_service'
                  '.SovosInvoiceService.send_ubl',
                  side_effect=alternate_fail,
              ):
