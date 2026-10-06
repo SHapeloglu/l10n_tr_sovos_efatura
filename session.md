@@ -78,6 +78,12 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
   ("Importing test framework…") bu modülden değil, custom_addons'taki başka bir modülden.
   Prod: workers=4 → işçiler yenilendikçe yeni Python kodu devreye girer; prod DB'de `-u` gerekmiyor.
   - `odoo18-prod` kullanıcı tarafından yeniden başlatıldı → active; journalctl'de ERROR/CRITICAL yok (logfile ayrıca kontrol edilecek).
+  - Prod log (`/var/log/odoo/odoo18-prod.log`, `grep -a` gerekli — dosyada binary karakter var): yeniden
+    başlatma sonrası modülle ilgili hata yok; `olap_prod` registry'si ilk istekte yüklenecek.
+  - **Modül dışı bulgular (kullanıcıya bildirildi, onay bekliyor):** prod servisinde `dbfilter`/`list_db` yok →
+    prod tüm DB'leri (odoo18-test, sovos_ci_test, isg) sunuyor ve `/web/database/manager` internetten erişilebilir
+    (Haziran'da "Database creation error"); port dışa açık (TLS tarayıcıları). Öneri: `list_db = False`,
+    `dbfilter = ^olap_prod$`, güçlü `admin_passwd`, portları 127.0.0.1 + nginx HTTPS. `isg` DB'de 31 isg_* modülü eksik.
 
 ---
 

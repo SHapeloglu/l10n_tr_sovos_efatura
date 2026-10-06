@@ -2,6 +2,9 @@
 
 ## 🔜 Sıradaki
 
+- [ ] **Güvenlik (sunucu, modül dışı):** prod/test conf'a `list_db = False` + `dbfilter` + güçlü `admin_passwd`; Odoo portlarını 127.0.0.1'e bağla, nginx HTTPS — kullanıcı onayıyla
+- [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
+
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
 - [ ] (İsteğe bağlı) Hata yolunda doğrulama XML eki / `x_validation_errors` rollback'te kayboluyor; kalıcı olması istenirse hata sonrası ayrı bir 'hata raporu' adımı tasarla (ayrı cursor kilitlenme riski nedeniyle reddedildi)
 - [ ] v8 yeni özellikleri için test yaz: `ubl_parser`, `incoming_matcher`, `efatura.product.mapping`, gelen fatura eşleme sihirbazı (şu an testi yok)
