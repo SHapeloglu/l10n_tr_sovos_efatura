@@ -200,13 +200,13 @@ class TestUblBuilder(SovosTestCommon):
         from odoo.addons.l10n_tr_sovos_efatura.services.ubl_builder import UblBuilder
 
         inv = self._create_invoice()
-        inv.write({'state': 'posted', 'name': 'TST2026000000001'})
 
-        # Section satırı ekle
+        # Section satırı ekle (posted faturada satır değiştirilemez → önce ekle)
         inv.write({'invoice_line_ids': [(0, 0, {
             'name': 'Bölüm Başlığı',
             'display_type': 'line_section',
         })]})
+        inv.write({'state': 'posted', 'name': 'TST2026000000001'})
 
         xml_bytes = UblBuilder(self.company).build(inv, 'test-uuid-0000', 'TST2026000000001', 'TICARIFATURA')
         root = etree.fromstring(xml_bytes)

@@ -269,11 +269,15 @@ class AccountMove(models.Model):
         if not valid:
             self._release_number()
             self.write({'x_validation_errors': '\n'.join(errors)})
-            err_detail = errors[0] if errors else ''
+            # UserError transaction'ı geri aldığı için alanlara/eke yazılanlar kalıcı
+            # olmaz; kullanıcının hataları görebilmesi için ilk 5 hata mesajda gösterilir.
+            err_detail = '\n'.join('• %s' % e for e in errors[:5])
+            if len(errors) > 5:
+                err_detail += '\n' + _('… ve %s hata daha') % (len(errors) - 5)
             # Madde 10: Hatalı XML'i ir.attachment olarak kaydet (chatter'a bağlantı ekle)
             self._attach_validation_xml(xml_bytes, layer)
-            self._set_error(_('UBL validasyon hatası [%s]: %s') % (layer, err_detail))
-            raise UserError(_('UBL validasyon hatası [%s]: %s') % (layer, err_detail))
+            self._set_error(_('UBL validasyon hatası [%s]:\n%s') % (layer, err_detail))
+            raise UserError(_('UBL validasyon hatası [%s]:\n%s') % (layer, err_detail))
 
         # ── 8. Odoo POSTED ────────────────────────────────────────────────
         # Validasyon geçti → Odoo faturasını onayla.
@@ -425,6 +429,10 @@ class AccountMove(models.Model):
         """
         Hata durumunda rezerve numarayı serbest bırakır.
         Sequence counter geri alınamaz — numara boşluk oluşturur (normaldir).
+
+        Not: Çağıran akış ardından UserError fırlattığı için bu yazım transaction
+        ile birlikte geri alınır; kalıcı sonuç faturanın rezervasyon öncesi haline
+        (numarasız taslak) dönmesidir. Buradaki asıl iz log kaydıdır.
         """
         self.write({'x_number_status': 'released'})
         _logger.warning(

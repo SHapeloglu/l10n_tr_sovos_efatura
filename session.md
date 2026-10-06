@@ -53,6 +53,16 @@
     bekliyor; ancak `raise UserError` tüm transaction'ı geri aldığı için hata/serbest bırakma
     bilgisi üretimde de kalıcı olmuyor. Tasarım kararı kullanıcıya soruldu.
 
+- 7. çalıştırma (18.0.8.0.4): **6 failure + 1 error / 195** (29'dan düştü). Kalanlar ve çözüm (18.0.8.0.5):
+  - test_section_lines_excluded…: section satırı posted faturaya ekleniyordu → önce ekle, sonra posted.
+  - test_atomic_number 6 test: 'released' kalıcı olamaz (UserError → rollback). İncelenen
+    "ayrı cursor ile kaydet" seçeneği **reddedildi**: ana transaction fatura satırını kilitlediği
+    için ayrı cursor UPDATE'i kendini bekler (kilitlenme), aynı istekte oluşturulan faturayı ise hiç göremez.
+    Karar: akış ve sıra değişmedi; testler gerçek garantiyi doğruluyor (numara faturada kalmaz,
+    fatura draft, 'sent' olmaz). Kod: doğrulama hatasında ilk 5 hata UserError mesajında
+    gösteriliyor (alan/ek rollback'te kaybolduğu için).
+  - Bilinen sınırlama: hata yolunda doğrulama XML eki ve x_validation_errors kalıcı değil (task.md).
+
 ---
 
 ## Önceki Çalışmalar

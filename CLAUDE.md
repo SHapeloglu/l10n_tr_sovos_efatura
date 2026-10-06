@@ -2,7 +2,7 @@
 
 Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura ve e-Arşiv gönderimi, gelen alış faturalarını alma, durum takibi, TİCARİFATURA kabul/red, iptal/yeniden gönderim, kur farkı faturası, PDF arşivi, VKN cache, çok şirket. Gönderim öncesi UBL-TR XSD + iş kuralı doğrulaması ve **atomik fatura numarası** rezervasyonu.
 
-- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.8.0.4** (2026-10-06; sunucudaki v8 + güvenlik ve Odoo 18 uyum düzeltmeleri)
+- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.8.0.5** (2026-10-06; sunucudaki v8 + güvenlik ve Odoo 18 uyum düzeltmeleri)
 - Mimari: `architect.md` · Görevler: `task.md` · Fikirler: `backlog.md` · Günlük: `session.md`
 
 ## ⚠️ Sunucu kopyası ile repo
