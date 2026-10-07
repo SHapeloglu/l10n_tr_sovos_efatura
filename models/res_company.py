@@ -188,7 +188,7 @@ class ResCompany(models.Model):
     x_sovos_last_fetch_date = fields.Date(
         string='Son Gelen Fatura Sorgu Tarihi',
         help=(
-            'Sovos GetUblList son başarılı sorgu tarihi.\n'
+            'Gelen fatura cron\'unun bir sonraki çalışmada başlayacağı gün (dahil).\n'
             'SSS S3/S10: GetUblList max 1 günlük tarih aralığı destekler.\n'
             'Cron bu tarihten bugüne kadar günlük chunk\'larla sorgular.\n'
             'Boş → ilk çalışmada son 7 gün (VUK limiti) taranır.'

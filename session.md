@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-10-07
+
+- PR #3 (gelen fatura cron'u, 18.0.8.0.6) `main`'e birleştirildi.
+- 18.0.8.0.7 (dal `fix/eslesme-sihirbazi-doviz`): eşleme sihirbazı artık faturanın satırlarıyla açılıyor (öneri ön dolu); pasif / tanımsız para birimli gelen fatura TRY'ye düşmüyor, 'pending' + not. 302 test geçti (geçici `sovos_ci7_test` DB, test sonrası silindi; `odoo18-test` servisi durdurulmadı — `--no-http`).
+- Sunucu 18.0.8.0.7'ye güncellendi (kurulum otomatik izinde reddedildi, betiği kullanıcı çalıştırdı): yedek `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.5_20261007_160128`, `odoo18-test` `installed|18.0.8.0.7`, test + prod hatasız. Log'daki tek ERROR (`Importing test framework`) Sovos'tan değil, OCA `mail_gateway`'den — önceden de vardı (`/root/odoo.md` #52).
+- Sunucu genelindeki Odoo işleri artık `/root/odoo.md`'de takip ediliyor.
+
+---
+
 ## 📍 Kaldığımız yer — 2026-10-06 sonu
 
 **Biten:** v8 repoya alındı → 18.0.8.0.5 (güvenlik + Odoo 18 uyumu + test düzeltmeleri); 229 test geçti; sunucu klasörü
@@ -148,6 +157,19 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     eşleme sihirbazı `line_ids` üretmiyor → öğrenen tablo arayüzden hiç dolmuyor;
     `_find_currency` pasif dövizi bulamıyor → dövizli fatura TRY kaydoluyor.
   - Testler mevcut davranışı doğruluyor; bu hatalar düzeltilince ilgili testler (autospec, sihirbaz satırları) eklenecek.
+
+- **PR #2 birleştirildi; gelen fatura cron düzeltmesi (dal `fix/gelen-fatura-cron`, 18.0.8.0.6):**
+  - `_sync_incoming_for_company`: `x_sovos_last_fetch_date` (önceden tanımlı ama kullanılmayan alan) → bugün, gün gün
+    `get_inbound_list(gün, gün)`. Kararlar: tarih = "sonraki çalışmanın başlangıç günü (dahil)" — son gün her çalışmada
+    yeniden sorgulanır (gün içinde yeni belge düşer; mükerrer UUID atlanır); ilk çalışma 7 gün (alan yardım metnindeki VUK notu);
+    üst sınır yok (cron uzun süre durursa atlanan gün kalmasın); işlenemeyen faturası olan gün ilerletilmez → otomatik tekrar;
+    fatura başına `cr.savepoint()` (DB hatası diğer faturaları bozmasın — testte `SELECT 1/0` ile doğrulandı); "bugün" Europe/Istanbul.
+  - SSS 10: GetUblList tarihi gelen belgenin Sovos'a düştüğü tarihtir (fatura tarihi değil), en fazla 1 gün; SSS 5: aralık
+    dakika cinsinden denetleniyor. Örnek istemci XSD'sinde FromDate/ToDate `xs:dateTime` → `T00:00:00`–`T23:59:59` gönderiliyor.
+  - **Yeni bulgu:** örnek istemci şeması ile modülün SOAP istekleri (ad alanı, mesaj/alan adları, kimlik doğrulama) uyuşmuyor;
+    test servisinin WSDL'i dışarıya açık değil, prod adresi yanıt vermiyor; `odoo18-test`'te Sovos kullanıcısı tanımlı şirket yok →
+    cron bugüne kadar hiç çalışmamış, istemci gerçek Sovos'la hiç denenmemiş. task.md + `/root/ISLISTESI.md`.
+  - `sovos_ci_test`: **297 test, failure/error yok**; dış istek denemesi 2 → 0.
 
 ---
 

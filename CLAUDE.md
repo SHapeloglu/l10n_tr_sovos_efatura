@@ -2,18 +2,18 @@
 
 Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura ve e-Arşiv gönderimi, gelen alış faturalarını alma, durum takibi, TİCARİFATURA kabul/red, iptal/yeniden gönderim, kur farkı faturası, PDF arşivi, VKN cache, çok şirket. Gönderim öncesi UBL-TR XSD + iş kuralı doğrulaması ve **atomik fatura numarası** rezervasyonu.
 
-- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.8.0.5** (2026-10-06; sunucudaki v8 + güvenlik ve Odoo 18 uyum düzeltmeleri)
+- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo ve sunucu sürümü **18.0.8.0.7** (2026-10-07; gelen fatura cron + eşleme sihirbazı + pasif döviz düzeltmeleri)
 - Mimari: `architect.md` · Görevler: `task.md` · Fikirler: `backlog.md` · Günlük: `session.md`
 
-## 📍 Kaldığımız yer (2026-10-06)
+## 📍 Kaldığımız yer (2026-10-07)
 
-- **Modül:** 18.0.8.0.5 — 229 test temiz DB'de geçiyor; sunucu klasörü güncellendi, `odoo18-test` `-u` yapıldı, prod yeniden başlatıldı (hatasız). PR #1 `main`'e birleştirildi (2026-10-06) — `main` artık sunucudaki kopyayla aynı sürümde.
-- **Ortamlar (2026-10-06):** hiçbir DB'de gerçek iş verisi yok (odoo18-test: 0 fatura, 6 partner). `olap_prod` boş (12 çekirdek modül). Tüm projeler (`l10n_tr_sovos_efatura`, `nakliye_yonetim`, `mail_gateway*`, `wa_erp_bot` + muhasebe/satış/stok) `odoo18-test`'te — geliştirme ortamı. e-Fatura canlıda değil; canlıya geçiş = `olap_prod`'a kurulum (kullanıcı onayıyla).
-- **⚠ Prod DB'de modül kurulu görünmüyor:** 2026-10-06'da `olap_prod` → `ir_module_module` satırı `uninstalled` (`odoo18-test`'te `installed|18.0.8.0.5`). Prod servisi klasörü yüklüyor ama modül prod DB'de etkin değil; doğrula, kurulum (`-i`) yalnızca kullanıcı onayıyla.
+- **Modül:** 18.0.8.0.7 — 302 test temiz DB'de geçiyor; PR #3 (gelen fatura cron'u) ve PR #4 (eşleme sihirbazı satırları + pasif döviz) `main`'de. 2026-10-07: sunucu klasörü 0.7'ye güncellendi (kullanıcı betiği çalıştırdı; yedek `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.5_20261007_160128`), `odoo18-test` `-u` → `installed|18.0.8.0.7`, test + prod hatasız açıldı. `main` = sunucu.
+- **⚠ Prod DB'de modül kurulu görünmüyor:** 2026-10-06'da `olap_prod` → `ir_module_module` satırı `uninstalled` (2026-10-07'de yeniden doğrulandı: hâlâ `uninstalled`; `odoo18-test`'te `installed|18.0.8.0.7`). Prod servisi klasörü yüklüyor ama modül prod DB'de etkin değil; doğrula, kurulum (`-i`) yalnızca kullanıcı onayıyla.
 - **Sunucu sıkılaştırma yapıldı:** conf'larda `db_name`/`dbfilter`/`list_db=False`, `http_interface=127.0.0.1`, `proxy_mode=True`, yeni `admin_passwd`; PostgreSQL 5432 4 IP'ye daraltıldı, pg_hba `hostssl`.
-- **Bekleyen (kullanıcıda):** DNS panellerine A kayıtları (95.111.242.96) → `certbot renew` — 7 sertifika süresi dolmuş, adımlar `task.md`'de. Kayıtlar `dig` ile görünmeden certbot çalıştırma (LE: saatte 5 başarısız deneme).
+- **Bekleyen (kullanıcıda):** Sovos test hesabı + güncel WS dokümanı (SOAP doğrulaması için).
 - **Bekleyen (karar):** Ollama 11434 / VNC 5901 / Docker 8090 / 8080 kim kullanıyor; kullanılmayan alan adları.
-- **Sonraki modül işi:** gelen fatura hataları (task.md: cron tarihsiz çağrı, sihirbaz satırları, pasif döviz) — testleri `tests/test_incoming.py`'de.
+- **Sonraki modül işi:** ⚠ SOAP katmanını Sovos test hesabıyla doğrula (örnek istemci şemasıyla uyuşmuyor — task.md); gelen fatura testleri `tests/test_incoming.py`'de.
+- Sunucu genelindeki Odoo işleri (servisler, ISG, wa_erp_bot …) `/root/odoo.md`'de.
 - Kullanıcı sunucuda root; komutları kullanıcı çalıştırıp çıktıyı yapıştırıyor (oturumdan SSH yok). Uzun komutları `cat > script.sh <<'EOF'` + `bash script.sh` biçiminde ver — doğrudan yapıştırmada satırlar karışıyor.
 - Test çalıştırma: `bash /tmp/sovos_pr/run_tests.sh` (geçici `sovos_ci_test` DB, `/tmp/sovos_pr` klonu). Odoo başarıda "failures" satırı yazmaz; `odoo.tests.stats` satırına bak.
 
@@ -22,7 +22,8 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 - Sunucudaki kurulu kopya: **`/opt/odoo/custom_addons/l10n_tr_sovos_efatura`** (git deposu değil). `odoo18-prod` (8076, `olap_prod`) ve `odoo18-test` (8074, `odoo18-test`) servisleri bu klasörü yüklüyor.
 - 2026-10-05: sunucudaki v18.0.8.0.0 repoya alındı (18.0.8.0.1: SOAP kimlik bilgisi XML kaçışı, gelen faturada XXE önlemi).
 - 2026-10-06: sunucu klasörü repodan **18.0.8.0.5**'e güncellendi (`git archive` + mevcut `services/schemas/` korundu); `odoo18-test` DB'de `-u` yapıldı. Eski kopya yedeği: `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.0_20261006_025643`. Prod DB'de `-u` yapılmadı (gerek yok: yalnızca Python değişikliği).
-- Her servis conf'unda `db_name` + `dbfilter = ^<db>$` + `list_db = False` var (2026-10-06). `db_name` kaldırılırsa cron tüm DB'lerde dolaşır — test servisi prod cron'larını çalıştırır.
+- 2026-10-07: sunucu klasörü **18.0.8.0.7**'ye güncellendi (aynı yöntem; `kaynaklar/*.xlsx` korundu), `odoo18-test` `-u`, test + prod yeniden başlatıldı. Not: `odoo` kullanıcısı root'a ait dizine `--logfile` yazamaz — log'u `odoo`'nun yazabildiği yere ver ya da servis log'una bak (`/var/log/odoo/`, saatler UTC).
+- prod/test conf'unda `db_name` + `dbfilter = ^<db>$` + `list_db = False` var (2026-10-06; `odoo18-isg` henüz değil — `/root/odoo.md` #51). `db_name` kaldırılırsa cron tüm DB'lerde dolaşır — test servisi prod cron'larını çalıştırır.
 - Yedekleri `custom_addons` **dışında** tut (`/opt/odoo/backups/`) — klasördeki kopyalar Odoo modül taramasına karışabilir.
 - GİB şema dosyaları (`services/schemas/` altı, `VERSION` hariç) repoda yok — sunucuda `setup_schemas.sh` ile kurulur. Sunucuyu repodan güncellerken mevcut `services/schemas/` korunmalı.
 - Bir de sunucuda `l10n_tr_sovos_efatura.bak_20260628` yedeği var.
