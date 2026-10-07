@@ -35,6 +35,7 @@ sunucu conf sıkılaştırması (db_name/dbfilter/list_db, http_interface 127.0.
 - Veri sayımı: `odoo18-test` 0 fatura / 6 partner / son giriş 2026-08-14; `olap_test` 0 / 14 / 2026-06-24; `olap_prod`'da muhasebe yok.
   → **Hiçbir ortamda gerçek iş verisi yok; e-Fatura canlıda değil.** odoo18-test geliştirme ortamı — güncelleme güvenli.
   Canlıya geçiş ileride: `olap_prod`'a uygulamalar + özel modüller kurulacak (kullanıcı onayıyla).
+- Bu oturumun gelen fatura düzeltmesi (`0af25e5`, 18.0.8.0.6) PR #3/#4 ile mükerrer çıktı → `git revert` ile geri alındı; esas olan `main`'deki 0.6/0.7.
 
 ---
 

@@ -8,6 +8,7 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 ## 📍 Kaldığımız yer (2026-10-07)
 
 - **Modül:** 18.0.8.0.7 — 302 test temiz DB'de geçiyor; PR #3 (gelen fatura cron'u) ve PR #4 (eşleme sihirbazı satırları + pasif döviz) `main`'de. 2026-10-07: sunucu klasörü 0.7'ye güncellendi (kullanıcı betiği çalıştırdı; yedek `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.5_20261007_160128`), `odoo18-test` `-u` → `installed|18.0.8.0.7`, test + prod hatasız açıldı. `main` = sunucu.
+- **Ortamlar:** hiçbir DB'de gerçek iş verisi yok (2026-10-06: odoo18-test 0 fatura, 6 partner). `olap_prod` boş (12 çekirdek modül, uygulama yok); tüm projeler (`l10n_tr_sovos_efatura`, `nakliye_yonetim`, `mail_gateway*`, `wa_erp_bot` + muhasebe/satış/stok) `odoo18-test`'te. e-Fatura canlıda değil; canlıya geçiş = `olap_prod`'a kurulum (kullanıcı onayıyla).
 - **⚠ Prod DB'de modül kurulu görünmüyor:** 2026-10-06'da `olap_prod` → `ir_module_module` satırı `uninstalled` (2026-10-07'de yeniden doğrulandı: hâlâ `uninstalled`; `odoo18-test`'te `installed|18.0.8.0.7`). Prod servisi klasörü yüklüyor ama modül prod DB'de etkin değil; doğrula, kurulum (`-i`) yalnızca kullanıcı onayıyla.
 - **Sunucu sıkılaştırma yapıldı:** conf'larda `db_name`/`dbfilter`/`list_db=False`, `http_interface=127.0.0.1`, `proxy_mode=True`, yeni `admin_passwd`; PostgreSQL 5432 4 IP'ye daraltıldı, pg_hba `hostssl`.
 - **Bekleyen (kullanıcıda):** Sovos test hesabı + güncel WS dokümanı (SOAP doğrulaması için).
