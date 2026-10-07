@@ -30,8 +30,8 @@
 
                 <!-- Fatura Kalemleri -->
                 <field name="line_ids">
-                    <list editable="bottom" decoration-warning="confidence &lt; 0.85"
-                          decoration-danger="confidence &lt; 0.60">
+                    <list editable="bottom" decoration-warning="confidence &lt; 85"
+                          decoration-danger="confidence &lt; 60">
                         <field name="efatura_description" readonly="1"/>
                         <field name="efatura_quantity" readonly="1"/>
                         <field name="efatura_uom_code" readonly="1"/>

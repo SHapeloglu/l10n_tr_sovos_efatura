@@ -2,7 +2,7 @@
 
 Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura ve e-Arşiv gönderimi, gelen alış faturalarını alma, durum takibi, TİCARİFATURA kabul/red, iptal/yeniden gönderim, kur farkı faturası, PDF arşivi, VKN cache, çok şirket. Gönderim öncesi UBL-TR XSD + iş kuralı doğrulaması ve **atomik fatura numarası** rezervasyonu.
 
-- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.8.0.6** (2026-10-06; gelen fatura cron düzeltmesi — sunucuda hâlâ 18.0.8.0.5)
+- GitHub: https://github.com/SHapeloglu/l10n_tr_sovos_efatura — repo sürümü **18.0.8.0.7** (2026-10-07; gelen fatura cron + eşleme sihirbazı + pasif döviz düzeltmeleri — sunucuda hâlâ 18.0.8.0.5)
 - Mimari: `architect.md` · Görevler: `task.md` · Fikirler: `backlog.md` · Günlük: `session.md`
 
 ## 📍 Kaldığımız yer (2026-10-06)
@@ -12,7 +12,7 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 - **Sunucu sıkılaştırma yapıldı:** conf'larda `db_name`/`dbfilter`/`list_db=False`, `http_interface=127.0.0.1`, `proxy_mode=True`, yeni `admin_passwd`; PostgreSQL 5432 4 IP'ye daraltıldı, pg_hba `hostssl`.
 - **Bekleyen (kullanıcıda):** DNS panellerine A kayıtları (95.111.242.96) → `certbot renew` — 7 sertifika süresi dolmuş, adımlar `task.md`'de. Kayıtlar `dig` ile görünmeden certbot çalıştırma (LE: saatte 5 başarısız deneme).
 - **Bekleyen (karar):** Ollama 11434 / VNC 5901 / Docker 8090 / 8080 kim kullanıyor; kullanılmayan alan adları.
-- **Sonraki modül işi:** ⚠ SOAP katmanını Sovos test hesabıyla doğrula (örnek istemci şemasıyla uyuşmuyor — task.md); sonra gelen fatura hataları (sihirbaz satırları, pasif döviz) — testleri `tests/test_incoming.py`'de.
+- **Sonraki modül işi:** ⚠ SOAP katmanını Sovos test hesabıyla doğrula (örnek istemci şemasıyla uyuşmuyor — task.md); sonra 0.6+0.7 sunucuya kurulumu; gelen fatura testleri `tests/test_incoming.py`'de.
 - Kullanıcı sunucuda root; komutları kullanıcı çalıştırıp çıktıyı yapıştırıyor (oturumdan SSH yok). Uzun komutları `cat > script.sh <<'EOF'` + `bash script.sh` biçiminde ver — doğrudan yapıştırmada satırlar karışıyor.
 - Test çalıştırma: `bash /tmp/sovos_pr/run_tests.sh` (geçici `sovos_ci_test` DB, `/tmp/sovos_pr` klonu). Odoo başarıda "failures" satırı yazmaz; `odoo.tests.stats` satırına bak.
 

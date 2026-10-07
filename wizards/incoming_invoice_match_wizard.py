@@ -55,7 +55,58 @@ class IncomingInvoiceMatchWizard(models.TransientModel):
             invoice = self.env['account.move'].browse(invoice_id)
             res['invoice_id'] = invoice.id
             res['partner_id'] = invoice.partner_id.id if invoice.partner_id else False
+            if 'line_ids' in fields_list:
+                res['line_ids'] = self._prepare_line_vals(invoice)
         return res
+
+    @api.model
+    def _prepare_line_vals(self, invoice):
+        """
+        Faturanın ürün satırlarından wizard satırlarını üretir.
+        Satırda ürün varsa onu gösterir; yoksa IncomingMatcher önerisini ön doldurur.
+        """
+        from ..services.incoming_matcher import IncomingMatcher
+        matcher = IncomingMatcher(self.env)
+        supplier_id = invoice.partner_id.id if invoice.partner_id else False
+
+        commands = []
+        for line in invoice.invoice_line_ids.filtered(lambda l: l.display_type == 'product'):
+            # Cron, düşük güvenli satırların adına "\n[e-Fatura: ...]" notu ekliyor;
+            # öğrenen tabloya ham açıklama yazılmalı.
+            description = (line.name or '').split('\n[', 1)[0].strip()
+
+            if line.product_id:
+                match = {
+                    'product': line.product_id,
+                    'account': line.account_id,
+                    'tax_ids': line.tax_ids,
+                    'uom':     line.product_uom_id,
+                    'confidence': 1.0,
+                    'source':  'invoice_line',
+                }
+            else:
+                match = matcher.find_product(supplier_id, description)
+
+            product = match.get('product')
+            account = match.get('account') or line.account_id
+            taxes   = match.get('tax_ids') or line.tax_ids
+            uom     = match.get('uom') or line.product_uom_id
+
+            commands.append((0, 0, {
+                'move_line_id':        line.id,
+                'efatura_description': description,
+                'efatura_quantity':    line.quantity,
+                'efatura_uom_code':    line.product_uom_id.x_ubl_code or '',
+                'efatura_unit_price':  line.price_unit,
+                'efatura_tax_percent': sum(line.tax_ids.mapped('amount')),
+                'confidence':          match.get('confidence', 0.0) * 100,
+                'match_source':        match.get('source', 'none'),
+                'product_id':          product.id if product else False,
+                'account_id':          account.id if account else False,
+                'tax_ids':             [(6, 0, taxes.ids)] if taxes else [],
+                'uom_id':              uom.id if uom else False,
+            }))
+        return commands
 
     def action_confirm(self):
         """
