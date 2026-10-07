@@ -55,54 +55,7 @@ class IncomingInvoiceMatchWizard(models.TransientModel):
             invoice = self.env['account.move'].browse(invoice_id)
             res['invoice_id'] = invoice.id
             res['partner_id'] = invoice.partner_id.id if invoice.partner_id else False
-            if 'line_ids' in fields_list:
-                res['line_ids'] = [(0, 0, vals) for vals in self._prepare_line_vals(invoice)]
         return res
-
-    @api.model
-    def _prepare_line_vals(self, invoice):
-        """
-        Faturanın ürün satırlarından sihirbaz satırları üretir.
-        Satırda ürün zaten varsa (senkron sırasında eşlenmiş) o kullanılır; yoksa
-        IncomingMatcher önerisiyle (öğrenen tablo / UBL kodu / benzerlik) ön doldurulur.
-        """
-        from ..services.incoming_matcher import IncomingMatcher
-        matcher = IncomingMatcher(self.env)
-        supplier_id = invoice.partner_id.id if invoice.partner_id else False
-        result = []
-        for line in invoice.invoice_line_ids.filtered(lambda l: l.display_type == 'product'):
-            # Senkron, düşük güvenli satırların adına "\n[e-Fatura: ... | Eşleme: ...]" notu ekler
-            description = (line.name or '').split('\n[', 1)[0].strip()
-            vals = {
-                'move_line_id':        line.id,
-                'efatura_description': description,
-                'efatura_quantity':    line.quantity,
-                'efatura_unit_price':  line.price_unit,
-                'efatura_uom_code':    line.product_uom_id.x_ubl_code or '',
-                'efatura_tax_percent': sum(line.tax_ids.filtered(
-                    lambda t: t.amount_type == 'percent').mapped('amount')),
-                'account_id':          line.account_id.id or False,
-                'tax_ids':             [(6, 0, line.tax_ids.ids)],
-                'uom_id':              line.product_uom_id.id or False,
-            }
-            if line.product_id:
-                vals.update(product_id=line.product_id.id, confidence=100.0, match_source='invoice')
-            elif description:
-                match = matcher.find_product(supplier_id, description)
-                if match.get('product'):
-                    vals.update(
-                        product_id=match['product'].id,
-                        confidence=round(match.get('confidence', 0.0) * 100, 1),
-                        match_source=match.get('source') or '',
-                    )
-                    if match.get('account'):
-                        vals['account_id'] = match['account'].id
-                    if match.get('tax_ids'):
-                        vals['tax_ids'] = [(6, 0, match['tax_ids'].ids)]
-                    if match.get('uom'):
-                        vals['uom_id'] = match['uom'].id
-            result.append(vals)
-        return result
 
     def action_confirm(self):
         """
