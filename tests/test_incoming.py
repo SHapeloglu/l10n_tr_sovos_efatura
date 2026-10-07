@@ -511,6 +511,22 @@ class TestIncomingSync(IncomingTestCommon):
         move = self._sync(_ubl_invoice([_ubl_line(1, 'Ofis Sandalyesi Mavi', code='OS-12')], currency='EUR'))
         self.assertEqual(move.currency_id, eur)
 
+    def test_inactive_currency_keeps_currency_and_waits(self):
+        """Pasif döviz → fatura TRY'ye düşmemeli; doğru para birimiyle oluşup 'pending' beklemeli."""
+        eur = self.env.ref('base.EUR')
+        eur.active = False
+        move = self._sync(_ubl_invoice([_ubl_line(1, 'Ofis Sandalyesi Mavi', code='OS-12')], currency='EUR'))
+        self.assertEqual(move.currency_id, eur)
+        self.assertEqual(move.x_efatura_match_status, 'pending')
+        self.assertTrue(any('pasif' in (m.body or '') for m in move.message_ids))
+
+    def test_unknown_currency_falls_back_and_waits(self):
+        """Odoo'da hiç olmayan para birimi → şirket para birimi + 'pending' + not."""
+        move = self._sync(_ubl_invoice([_ubl_line(1, 'Ofis Sandalyesi Mavi', code='OS-12')], currency='XYZ'))
+        self.assertEqual(move.currency_id, self.company.currency_id)
+        self.assertEqual(move.x_efatura_match_status, 'pending')
+        self.assertTrue(any('XYZ' in (m.body or '') for m in move.message_ids))
+
     def test_ubl_fetch_failure_falls_back_to_header(self):
         """GetUBL başarısız → fatura başlık bilgisiyle, satırsız oluşur; inceleme bekler."""
         move = self._sync(ubl_error=Exception('Sovos zaman aşımı'))
@@ -675,6 +691,42 @@ class TestIncomingMatchWizard(IncomingTestCommon):
         ).default_get(['invoice_id', 'partner_id'])
         self.assertEqual(defaults['invoice_id'], self.invoice.id)
         self.assertEqual(defaults['partner_id'], self.supplier.id)
+
+    def _open_wizard(self):
+        self.invoice.partner_id = self.supplier
+        return self.env['sovos.incoming.match.wizard'].with_context(
+            default_invoice_id=self.invoice.id,
+        ).create({})
+
+    def test_default_get_fills_lines(self):
+        """Sihirbaz faturanın ürün satırlarıyla açılmalı (önceden line_ids boş açılıyordu)."""
+        # Cron düşük güvenli satırın adına eşleme notu ekler; öğrenen tabloya ham açıklama gitmeli
+        self.move_line.name = 'Masa Lambası LED\n[e-Fatura: Masa Lambası LED | Eşleme: none (0%)]'
+        wline = self._open_wizard().line_ids
+        self.assertEqual(len(wline), 1)
+        self.assertEqual(wline.move_line_id, self.move_line)
+        self.assertEqual(wline.efatura_description, 'Masa Lambası LED')
+        self.assertEqual((wline.efatura_quantity, wline.efatura_unit_price), (3.0, 100.0))
+        self.assertEqual(wline.account_id, self.account_expense)
+
+    def test_default_get_prefills_learned_mapping(self):
+        self.env['efatura.product.mapping'].create({
+            'supplier_id': self.supplier.id,
+            'efatura_description': 'Masa Lambası LED',
+            'product_id': self.product.id,
+        })
+        wline = self._open_wizard().line_ids
+        self.assertEqual(wline.product_id, self.product)
+        self.assertEqual((wline.match_source, wline.confidence), ('learned_mapping', 100.0))
+
+    def test_default_get_then_confirm_learns(self):
+        """Uçtan uca: sihirbazı aç → ürün seç → onayla → satır ve öğrenen tablo güncellenir."""
+        wizard = self._open_wizard()
+        wizard.line_ids.product_id = self.product
+        wizard.action_confirm()
+        self.assertEqual(self.move_line.product_id, self.product)
+        mapping = self.env['efatura.product.mapping'].find_mapping(self.supplier.id, 'Masa Lambası LED')
+        self.assertEqual(mapping.product_id, self.product)
 
     def test_confirm_applies_partner_lines_and_learns(self):
         result = self._wizard().action_confirm()

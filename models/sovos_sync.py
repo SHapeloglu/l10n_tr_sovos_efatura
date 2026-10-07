@@ -188,12 +188,17 @@ class SovosSync(models.Model):
         else:
             match_status = 'pending'
 
+        # Para birimi pasif/tanımsızsa kullanıcı düzeltene kadar kuyrukta beklesin
+        currency, currency_warning = self._find_currency(parsed, company)
+        if currency_warning:
+            match_status = 'pending'
+
         # 6. Fatura başlığı oluştur
         move_vals = {
             'move_type':           'in_invoice',
             'partner_id':          partner.id if partner else False,
             'invoice_date':        inv_date,
-            'currency_id':         self._find_currency(parsed, company),
+            'currency_id':         currency.id,
             'x_sovos_uuid':        uuid,
             'x_efatura_status':    'accepted',
             'x_efatura_type':      'efatura',
@@ -205,6 +210,9 @@ class SovosSync(models.Model):
             move_vals['narration'] = '\n'.join(parsed['notes'])
 
         move = AccountMove.create(move_vals)
+        if currency_warning:
+            _logger.warning('Gelen fatura para birimi (UUID=%s): %s', uuid, currency_warning)
+            move.message_post(body=currency_warning, subtype_xmlid='mail.mt_note')
 
         # 7. Satırları oluştur (FAZ 2 + FAZ 3) — sadece UBL parse başarılıysa
         if parsed and parsed.get('lines'):
@@ -288,14 +296,33 @@ class SovosSync(models.Model):
         return has_unmatched
 
     def _find_currency(self, parsed, company):
-        """UBL'deki para birimi koduna göre Odoo currency bul."""
+        """
+        UBL'deki para birimi koduna göre Odoo currency bul.
+        Pasif para birimleri de aranır: yalnız aktiflerde aramak USD/EUR faturayı
+        sessizce şirket para birimiyle (döviz tutarlarıyla) oluşturuyordu.
+
+        Returns: (res.currency, uyarı: str|False) — uyarı varsa fatura 'pending' olur.
+        """
         if not parsed:
-            return company.currency_id.id
-        currency_code = parsed.get('currency', 'TRY')
-        currency = self.env['res.currency'].search(
+            return company.currency_id, False
+        currency_code = parsed.get('currency') or 'TRY'
+        currency = self.env['res.currency'].with_context(active_test=False).search(
             [('name', '=', currency_code)], limit=1
         )
-        return currency.id if currency else company.currency_id.id
+        if not currency:
+            return company.currency_id, _(
+                'e-Fatura para birimi "%(code)s" Odoo\'da tanımlı değil; fatura %(company)s '
+                'ile oluşturuldu. Para birimini tanımlayıp faturada düzeltin.',
+                code=currency_code, company=company.currency_id.name,
+            )
+        if not currency.active:
+            return currency, _(
+                'e-Fatura para birimi %(code)s Odoo\'da pasif. Muhasebe > Para Birimleri\'nden '
+                'etkinleştirip kur girin, sonra faturada para birimini yeniden seçin '
+                '(şirket para birimi tutarları kur olmadan 1:1 hesaplanır).',
+                code=currency_code,
+            )
+        return currency, False
 
     # ── e-Fatura GİB Durum Takibi (30 dk) ────────────────────────────────
 

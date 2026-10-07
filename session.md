@@ -2,6 +2,14 @@
 
 ---
 
+## 2026-10-07
+
+- PR #3 (gelen fatura cron'u, 18.0.8.0.6) `main`'e birleştirildi.
+- 18.0.8.0.7 (dal `fix/eslesme-sihirbazi-doviz`): eşleme sihirbazı artık faturanın satırlarıyla açılıyor (öneri ön dolu); pasif / tanımsız para birimli gelen fatura TRY'ye düşmüyor, 'pending' + not. 302 test geçti (geçici `sovos_ci7_test` DB, test sonrası silindi; `odoo18-test` servisi durdurulmadı — `--no-http`).
+- Sunucu henüz 18.0.8.0.5'te; 0.6 + 0.7 birlikte kurulacak.
+
+---
+
 ## 📍 Kaldığımız yer — 2026-10-06 sonu
 
 **Biten:** v8 repoya alındı → 18.0.8.0.5 (güvenlik + Odoo 18 uyumu + test düzeltmeleri); 229 test geçti; sunucu klasörü
