@@ -137,6 +137,19 @@ yüklüyor; klasör değişince prod da yeni Python kodunu yeniden başlatmada/w
     `_find_currency` pasif dövizi bulamıyor → dövizli fatura TRY kaydoluyor.
   - Testler mevcut davranışı doğruluyor; bu hatalar düzeltilince ilgili testler (autospec, sihirbaz satırları) eklenecek.
 
+- **PR #2 birleştirildi; gelen fatura cron düzeltmesi (dal `fix/gelen-fatura-cron`, 18.0.8.0.6):**
+  - `_sync_incoming_for_company`: `x_sovos_last_fetch_date` (önceden tanımlı ama kullanılmayan alan) → bugün, gün gün
+    `get_inbound_list(gün, gün)`. Kararlar: tarih = "sonraki çalışmanın başlangıç günü (dahil)" — son gün her çalışmada
+    yeniden sorgulanır (gün içinde yeni belge düşer; mükerrer UUID atlanır); ilk çalışma 7 gün (alan yardım metnindeki VUK notu);
+    üst sınır yok (cron uzun süre durursa atlanan gün kalmasın); işlenemeyen faturası olan gün ilerletilmez → otomatik tekrar;
+    fatura başına `cr.savepoint()` (DB hatası diğer faturaları bozmasın — testte `SELECT 1/0` ile doğrulandı); "bugün" Europe/Istanbul.
+  - SSS 10: GetUblList tarihi gelen belgenin Sovos'a düştüğü tarihtir (fatura tarihi değil), en fazla 1 gün; SSS 5: aralık
+    dakika cinsinden denetleniyor. Örnek istemci XSD'sinde FromDate/ToDate `xs:dateTime` → `T00:00:00`–`T23:59:59` gönderiliyor.
+  - **Yeni bulgu:** örnek istemci şeması ile modülün SOAP istekleri (ad alanı, mesaj/alan adları, kimlik doğrulama) uyuşmuyor;
+    test servisinin WSDL'i dışarıya açık değil, prod adresi yanıt vermiyor; `odoo18-test`'te Sovos kullanıcısı tanımlı şirket yok →
+    cron bugüne kadar hiç çalışmamış, istemci gerçek Sovos'la hiç denenmemiş. task.md + `/root/ISLISTESI.md`.
+  - `sovos_ci_test`: **297 test, failure/error yok**; dış istek denemesi 2 → 0.
+
 ---
 
 ## Önceki Çalışmalar

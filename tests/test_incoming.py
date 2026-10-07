@@ -20,8 +20,10 @@ Sovos çağrıları mock'lanır; UBL örnekleri bu dosyada üretilir (gerçek VK
 """
 import os
 import tempfile
-from datetime import date
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
+
+from lxml import etree
 
 from psycopg2 import IntegrityError
 
@@ -433,7 +435,7 @@ class TestIncomingSync(IncomingTestCommon):
               sender_vkn=SUPPLIER_VKN, ubl_error=None):
         header = [{'uuid': uuid, 'sender_vkn': sender_vkn, 'invoice_date': '2026-09-14'}]
         ubl_kw = {'side_effect': ubl_error} if ubl_error else {'return_value': xml}
-        with patch.object(SovosInvoiceService, 'get_inbound_list', return_value=header), \
+        with patch.object(SovosInvoiceService, 'get_inbound_list', autospec=True, return_value=header), \
                 patch.object(SovosInvoiceService, 'get_invoice_ubl', **ubl_kw):
             self.env['sovos.sync']._sync_incoming_for_company(self.company)
         return self.env['account.move'].search([
@@ -523,6 +525,105 @@ class TestIncomingSync(IncomingTestCommon):
         self.assertEqual(len(move), 1)
         self.assertFalse(move.invoice_line_ids)
         self.assertEqual(move.x_efatura_match_status, 'review')
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# SORGU GÜNLERİ (GetUblList ≤ 1 gün)
+# ════════════════════════════════════════════════════════════════════════════
+
+class TestIncomingFetchWindow(IncomingTestCommon):
+    """
+    _sync_incoming_for_company gün aralığı: x_sovos_last_fetch_date → bugün,
+    her gün ayrı GetUblList; hata olan gün bir sonraki çalışmada tekrar denenir.
+    """
+
+    TODAY = date(2026, 10, 6)
+
+    def _run(self, day_lists=None, via_cron=False):
+        """day_lists: {gün: [başlık, ...] | Exception}. Döner: (sorgulanan aralıklar, notify mock)."""
+        day_lists = day_lists or {}
+        calls = []
+
+        def fake_list(svc, date_from, date_to):
+            calls.append((date_from, date_to))
+            result = day_lists.get(date_from, [])
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        sync = self.env['sovos.sync']
+        with patch.object(type(sync), '_sovos_today', return_value=self.TODAY), \
+                patch.object(SovosInvoiceService, 'get_inbound_list', autospec=True, side_effect=fake_list), \
+                patch.object(SovosInvoiceService, 'get_invoice_ubl', autospec=True, return_value=b''), \
+                patch.object(type(sync), '_notify_admin') as notify:
+            if via_cron:
+                sync._cron_run_for_all_companies('_sync_incoming_for_company')
+            else:
+                sync._sync_incoming_for_company(self.company)
+        return calls, notify
+
+    def test_first_run_scans_last_7_days(self):
+        self.company.x_sovos_last_fetch_date = False
+        calls, _notify = self._run()
+        expected = [self.TODAY - timedelta(days=n) for n in range(6, -1, -1)]
+        self.assertEqual(calls, [(d, d) for d in expected])
+        self.assertEqual(self.company.x_sovos_last_fetch_date, self.TODAY)
+
+    def test_resumes_from_last_fetch_date_inclusive(self):
+        self.company.x_sovos_last_fetch_date = self.TODAY - timedelta(days=2)
+        calls, _notify = self._run()
+        self.assertEqual([c[0] for c in calls], [
+            self.TODAY - timedelta(days=2), self.TODAY - timedelta(days=1), self.TODAY,
+        ])
+        self.assertEqual(self.company.x_sovos_last_fetch_date, self.TODAY)
+
+    def test_same_day_requeried_each_run(self):
+        self.company.x_sovos_last_fetch_date = self.TODAY
+        calls, _notify = self._run()
+        self.assertEqual(calls, [(self.TODAY, self.TODAY)])
+
+    def test_list_failure_keeps_failed_day_and_notifies(self):
+        yesterday = self.TODAY - timedelta(days=1)
+        self.company.x_sovos_last_fetch_date = self.TODAY - timedelta(days=2)
+        calls, notify = self._run({yesterday: Exception('HTTP 500')}, via_cron=True)
+        own_calls = [c for c in calls if c[0] >= self.TODAY - timedelta(days=2)]
+        self.assertEqual([c[0] for c in own_calls], [self.TODAY - timedelta(days=2), yesterday])
+        self.assertEqual(self.company.x_sovos_last_fetch_date, yesterday)
+        notify.assert_called()
+
+    def test_failed_invoice_does_not_block_others_and_day_is_retried(self):
+        """Bir faturada DB hatası (savepoint) → diğerleri oluşur, o gün sonraki çalışmada tekrar."""
+        yesterday = self.TODAY - timedelta(days=1)
+        self.company.x_sovos_last_fetch_date = yesterday
+        sync_cls = type(self.env['sovos.sync'])
+        original = sync_cls._process_single_incoming
+
+        def process(self_, uuid, *args):
+            if uuid.startswith('bad'):
+                self_.env.cr.execute('SELECT 1/0')  # transaction'ı bozan gerçek DB hatası
+            return original(self_, uuid, *args)
+
+        good = {'uuid': 'good-0001', 'sender_vkn': SUPPLIER_VKN, 'invoice_date': '2026-10-06'}
+        with patch.object(sync_cls, '_process_single_incoming', autospec=True, side_effect=process), \
+                mute_logger('odoo.sql_db'):
+            self._run({yesterday: [{'uuid': 'bad-0001', 'sender_vkn': SUPPLIER_VKN}], self.TODAY: [good]})
+        created = self.env['account.move'].search([('x_sovos_uuid', 'in', ('good-0001', 'bad-0001'))])
+        self.assertEqual(created.mapped('x_sovos_uuid'), ['good-0001'])
+        self.assertEqual(self.company.x_sovos_last_fetch_date, yesterday)
+
+    def test_sovos_today_uses_turkey_time(self):
+        # 22:30 UTC = ertesi gün 01:30 TR
+        with patch('odoo.fields.Datetime.now', return_value=datetime(2026, 10, 6, 22, 30)):
+            self.assertEqual(self.env['sovos.sync']._sovos_today(), date(2026, 10, 7))
+
+    def test_inbound_list_sends_full_day_datetime_range(self):
+        with patch.object(SovosInvoiceService, '_post', autospec=True,
+                          return_value=etree.fromstring(b'<r/>')) as post:
+            result = SovosInvoiceService(self.company).get_inbound_list(date(2026, 10, 5), date(2026, 10, 5))
+        self.assertEqual(result, [])
+        body = post.call_args[0][2]
+        self.assertIn('<ein:FromDate>2026-10-05T00:00:00</ein:FromDate>', body)
+        self.assertIn('<ein:ToDate>2026-10-05T23:59:59</ein:ToDate>', body)
 
 
 # ════════════════════════════════════════════════════════════════════════════
