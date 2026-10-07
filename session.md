@@ -6,7 +6,8 @@
 
 - PR #3 (gelen fatura cron'u, 18.0.8.0.6) `main`'e birleştirildi.
 - 18.0.8.0.7 (dal `fix/eslesme-sihirbazi-doviz`): eşleme sihirbazı artık faturanın satırlarıyla açılıyor (öneri ön dolu); pasif / tanımsız para birimli gelen fatura TRY'ye düşmüyor, 'pending' + not. 302 test geçti (geçici `sovos_ci7_test` DB, test sonrası silindi; `odoo18-test` servisi durdurulmadı — `--no-http`).
-- Sunucu henüz 18.0.8.0.5'te; 0.6 + 0.7 birlikte kurulacak.
+- Sunucu 18.0.8.0.7'ye güncellendi (kurulum otomatik izinde reddedildi, betiği kullanıcı çalıştırdı): yedek `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.5_20261007_160128`, `odoo18-test` `installed|18.0.8.0.7`, test + prod hatasız. Log'daki tek ERROR (`Importing test framework`) Sovos'tan değil, OCA `mail_gateway`'den — önceden de vardı (`/root/odoo.md` #52).
+- Sunucu genelindeki Odoo işleri artık `/root/odoo.md`'de takip ediliyor.
 
 ---
 
