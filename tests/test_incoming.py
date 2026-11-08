@@ -129,6 +129,11 @@ class IncomingTestCommon(SovosTestCommon):
             ('company_ids', 'in', self.company.id),
             ('deprecated', '=', False),
         ], limit=1)
+        # Gelen faturalar TRY ile geliyor; temiz DB'de TRY pasif olabiliyor ve pasif döviz
+        # faturayı 'pending' bırakıyor. Testler aktif TRY varsayar (pasif döviz davranışı ayrı testte).
+        self.env['res.currency'].with_context(active_test=False).search(
+            [('name', '=', 'TRY')], limit=1
+        ).active = True
         self.matcher = IncomingMatcher(self.env)
 
 
