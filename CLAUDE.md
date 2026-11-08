@@ -16,9 +16,16 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 - Kullanıcı sunucuda root; komutları kullanıcı çalıştırıp çıktıyı yapıştırıyor (oturumdan SSH yok). Uzun komutları `cat > script.sh <<'EOF'` + `bash script.sh` biçiminde ver — doğrudan yapıştırmada satırlar karışıyor.
 - Test çalıştırma: `bash /tmp/sovos_pr/run_tests.sh` (geçici `sovos_ci_test` DB, `/tmp/sovos_pr` klonu). Odoo başarıda "failures" satırı yazmaz; `odoo.tests.stats` satırına bak.
 
-## ⚠️ Sunucu kopyası ile repo
+## ⚠️ Sunucu düzeni (2026-11-08 incelemesi — Docker)
 
-- Sunucudaki kurulu kopya: **`/opt/odoo/custom_addons/l10n_tr_sovos_efatura`** (git deposu değil). `odoo18-prod` (8076, `olap_prod`) ve `odoo18-test` (8074, `odoo18-test`) servisleri bu klasörü yüklüyor.
+- Odoo **Docker** konteynerlerinde çalışıyor (systemd `odoo18-*` servisleri pasif, `/etc/odoo` yok). Tek imaj `odoo18:latest`, kaynak `/opt/odoo-docker/src/` (Dockerfile `COPY src/custom_addons` ile gömüyor). Dolayısıyla modül kodu **imaj yeniden derlenerek** (`/opt/odoo-docker`, `docker compose`) güncellenir; konteynerde `custom_addons` bind-mount yok.
+- Konteynerler: `odoo18-prod` (127.0.0.1:18076, DB `olap_prod`, conf `/opt/odoo-docker/conf/odoo18-prod.conf`), `odoo18-test` (127.0.0.1:18074, DB `odoo18-test`), `odoo18-isg` (127.0.0.1:18078). DB sunucusu: `postgres-ortak` konteyneri (127.0.0.1:5434, `db_host=postgres-ortak`). Sistem PostgreSQL 16 kullanılmıyor (veri dizini yok, unit maskelendi).
+- İmajdaki `l10n_tr_sovos_efatura` = repo (18.0.8.0.7, içerik olarak birebir aynı). Sunucudaki `/opt/odoo/custom_addons/l10n_tr_sovos_efatura` eski/yedek kopya, Odoo tarafından kullanılmıyor.
+- Prod DB (`olap_prod`): modül **`uninstalled`** (2026-11-08 doğrulandı). Kurulum (`-i`) yalnızca kullanıcı onayıyla.
+
+## ⚠️ Eski sunucu notları (systemd dönemi — 2026-10-06)
+
+- Eski kurulu kopya: **`/opt/odoo/custom_addons/l10n_tr_sovos_efatura`** (git deposu değil).
 - 2026-10-05: sunucudaki v18.0.8.0.0 repoya alındı (18.0.8.0.1: SOAP kimlik bilgisi XML kaçışı, gelen faturada XXE önlemi).
 - 2026-10-06: sunucu klasörü repodan **18.0.8.0.5**'e güncellendi (`git archive` + mevcut `services/schemas/` korundu); `odoo18-test` DB'de `-u` yapıldı. Eski kopya yedeği: `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.0_20261006_025643`. Prod DB'de `-u` yapılmadı (gerek yok: yalnızca Python değişikliği).
 - Her servis conf'unda `db_name` + `dbfilter = ^<db>$` + `list_db = False` var (2026-10-06). `db_name` kaldırılırsa cron tüm DB'lerde dolaşır — test servisi prod cron'larını çalıştırır.
@@ -30,14 +37,14 @@ Odoo 18 Community modülü: Sovos (GİB özel entegratörü) üzerinden e-Fatura
 ## Komutlar
 
 ```bash
-# Kurulum / güncelleme (sunucuda test ortamı)
-sudo -u odoo /opt/odoo/venv18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo/odoo18-test.conf -d odoo18-test -u l10n_tr_sovos_efatura --stop-after-init
-# Testler (Odoo test çatısı; tests/ altında 12 dosya)
-sudo -u odoo /opt/odoo/venv18/bin/python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo/odoo18-test.conf -d odoo18-test --test-tags /l10n_tr_sovos_efatura -u l10n_tr_sovos_efatura --stop-after-init
+# Docker düzeni (2026-11-08): kod imajda, güncelleme = imaj yeniden derleme + konteyner yeniden oluşturma
+# (/opt/odoo-docker/src güncellenir → docker build -t odoo18:latest → docker compose up -d odoo18-test)
+# Test DB'de -u (konteynerde, DENEME — doğrulanmadı):
+docker exec -u odoo odoo18-test python3 /opt/odoo/odoo18/odoo-bin -c /etc/odoo/odoo.conf -d odoo18-test -u l10n_tr_sovos_efatura --stop-after-init
 # GİB şemaları (v8): bash setup_schemas.sh UBL-TR1.2.1_Paketi.zip e-FaturaPaketi.zip
 ```
 
-Servis kullanıcısı / venv yolu sunucuda doğrulanmalı (`systemctl cat odoo18-test`). **Prod veritabanında `-u` çalıştırmadan önce test DB'de dene ve kullanıcıya sor.**
+Konteyner adları, DB adları ve yollar sunucuda doğrulanmalı (`docker ps`, `docker inspect`). **Prod veritabanında `-u`/`-i` çalıştırmadan önce test DB'de dene ve kullanıcıya sor.**
 
 ## Kurallar ve Tuzaklar
 
