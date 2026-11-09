@@ -13,7 +13,10 @@
   - [ ] Kullanılmayan alan adları: `certbot delete --cert-name <ad>` + ilgili nginx site dosyasını `sites-enabled`'dan kaldır → `nginx -t && systemctl reload nginx`
   - [ ] Tarayıcıdan `https://odoo18-prod.olap.com.tr` girişini doğrula (sertifika uyarısı olmamalı)
 - [ ] **Güvenlik (sunucu, modül dışı):** Ollama 11434 (auth yok, herkese açık), VNC 5901, Docker 8090 (ufw'yi atlar), 8080 — kullanıcı kim/nereden kullanıldığını bildirecek
-- [ ] `sovos_ci_test` geçici DB'sini sil (prod'dan görünüyor)
+- [x] `sovos_ci_test` geçici DB'sini sil (2026-11-09 silindi; test sonrası temizlik)
+- [x] Gelen fatura testleri temiz DB'de geçiyor: `setUp`'ta TRY aktifleştirildi → 302 test, 0 hata (2026-11-09, PR #6)
+- [ ] Sunucu güvenliği (2026-11-09): VNC 5901 dış dünyadan kapalı (UFW kuralı yok, başka oturum kaldırdı); 1433 ve 8090 kuralları silindi; fail2ban sshd aktif. Kalan: root `claude` süreçlerinin (PID 1565460, 2223229, 3927474) kime ait olduğu, `odoo18-test`'i kimin durdurduğu, disk %91
+- [ ] Prod Sovos kurulumu: test sonuçlarından ve gerçek Sovos testinden sonra karar (`olap_prod` boş Odoo kurulumu; yedek `/opt/odoo/backups/olap_prod_pre_sovos_install_20261108_1247.dump`)
 
 - [ ] **Prod DB'de modül durumu:** `olap_prod`'da `l10n_tr_sovos_efatura` `uninstalled` görünüyor — doğrula; prod'da kullanılacaksa önce `olap_prod` yedeği, sonra `-i l10n_tr_sovos_efatura` (kullanıcı onayıyla, Sovos şirket ayarları + test modu açık başla)
 - [ ] Prod'da ilk gerçek gönderim + cron çalışmalarını logdan izle; sunucu kopyasını git ile yönetilir hale getir
