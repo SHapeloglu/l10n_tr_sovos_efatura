@@ -2,6 +2,31 @@
 
 ---
 
+## 2026-11-08 / 11-09
+
+**Yapılanlar:**
+- Sunucu (Contabo) salt okunur incelendi: Odoo Docker konteynerlerinde (`odoo18-prod`, `odoo18-test`, `odoo18-isg`), DB `postgres-ortak`'ta. Sunucudaki `/opt/odoo/custom_addons` kopyası Odoo tarafından kullanılmıyor; imajdaki kod repoyla içerik olarak birebir aynı (18.0.8.0.7). `CLAUDE.md` sunucu bölümü Docker düzenine göre güncellendi.
+- Sistem PostgreSQL 16 birimi (veri dizini yok, `failed`) maskelendi.
+- UFW: stale 1433 ve 8090 kuralları silindi; kaynak IP'li iki 1433 kuralı da sonradan silindi. 5901 (VNC) ve 8085 kuralları başka bir oturumca kaldırılmış (ben değil), VNC artık dış dünyadan kapalı, port hâlâ dinliyor.
+- fail2ban (sshd jail, 5 deneme / 10 dk → 1 saat ban) kuruldu.
+- `olap_prod` incelendi: boş Odoo kurulumu (`base` + yardımcılar), `account`/`l10n_tr` yok, son yazma 25 Haziran 2026. Yedek alındı: `/opt/odoo/backups/olap_prod_pre_sovos_install_20261108_1247.dump`. Prod'a Sovos kurulumu **yapılmadı** (karar: test ortamında kalacak).
+- `odoo18-test` üzerinde `l10n_tr_sovos_efatura -u` başarılı (18.0.8.0.7, installed).
+- Test: temiz DB `sovos_ci_test` ilk koşuda 252 testten 4'ü başarısız (gelen fatura; pasif TRY test kurulumu). `tests/test_incoming.py` `setUp`'ında TRY aktifleştirildi → aynı DB'de **302 test, 0 failure / 0 error**. Geçici DB silindi.
+- PR #6 (`fix/test-incoming-try-active`) squash ile `main`'e birleşti (c30094c).
+
+**Kararlar / neden:**
+- Prod Sovos kurulumu test sonuçlarına ve gerçek Sovos testine bağlı olduğu için ertelendi.
+- Konteynerler: `odoo18-test` bir dış `docker stop` ile 08:41 UTC'de durdu (bizden değil); kullanıcı onayıyla yeniden başlatıldı. Kaynağı tespit edilemedi; root'ta çalışan `claude` süreçleri (PID 1565460, 2223229, 3927474) şüpheli, dokunulmadı.
+
+**Açık sorunlar:**
+- Gerçek Sovos testi yapılmadı: test hesabı bilgisi yok, SOAP şema uyuşmazlığı çözülmedi (`task.md`).
+- Sunucu diski %91 dolu.
+- Root `claude` süreçlerinin kime ait olduğu belirsiz.
+
+**Sıradaki adım:** Sovos test hesabı ile `test_connection`; şema uyuşmazlığı; ardından prod kararı.
+
+---
+
 ## 2026-10-07
 
 - PR #3 (gelen fatura cron'u, 18.0.8.0.6) `main`'e birleştirildi.
