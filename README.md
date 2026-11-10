@@ -44,6 +44,7 @@ Bu modül, **Odoo 18 Community** üzerinde çalışan işletmelerin **Sovos** (G
 | **Odoo Sürümü** | 18.0-20260528 Community (self-hosted) |
 | **Entegratör** | Sovos — GİB Özel Entegratörü |
 | **Modül Adı** | `l10n_tr_sovos_efatura` |
+| **Modül Sürümü** | 18.0.8.0.7 — `odoo18-test` DB'de kurulu; prod DB'de (`olap_prod`) kurulu değil |
 | **Spesifikasyon** | v8.0 — Haziran 2026 |
 | **v6 → v8 Yenilikleri** | saxonche bağımlılığı kaldırıldı; XSD (lxml) + GİB iş kuralları (XPath) validasyon; schemas/ dizin yapısı güncellendi |
 
@@ -172,6 +173,8 @@ action_post() (tekil) VEYA 'Toplu Gönder' (çoklu)
    ```bash
    ./odoo-bin -u l10n_tr_sovos_efatura -d <veritabani_adi>
    ```
+
+   > **Docker kurulumu:** Üretim sunucusunda Odoo Docker konteynerlerinde çalışır ve kod imaja gömülür. Güncelleme: kaynak güncellenir → imaj yeniden derlenir → konteyner yeniden oluşturulur. Ayrıntı için `CLAUDE.md` ("Sunucu düzeni"). Prod veritabanında `-u`/`-i` yalnızca kullanıcı onayıyla ve önce test veritabanında denenir.
 
 ---
 
@@ -506,6 +509,10 @@ Onay → status='cancelled' — sorumluluk kullanıcıya ait
 
 Test ortamında `x_sovos_test_mode=True` — GİB iletimi yapılmaz. VKN'ler KVKK kapsamında anonimleştirilmeli.
 
+**Otomatik testler (durum: 2026-11-09):** `tests/` altında 302 test; temiz bir veritabanında `--test-tags /l10n_tr_sovos_efatura` ile 0 hata.
+
+**Henüz yapılmayanlar:** Gerçek Sovos servisine karşı test yapılmadı. SOAP ad alanı ve operasyon adları resmi örnek şemayla uyuşmuyor; Sovos test hesabıyla WSDL alınarak doğrulanmalı. Prod'da ilk gerçek gönderim henüz yapılmadı.
+
 <details>
 <summary>34 Test Senaryosunu Görüntüle</summary>
 
@@ -570,7 +577,7 @@ Test ortamında `x_sovos_test_mode=True` — GİB iletimi yapılmaz. VKN'ler KVK
 <div align="center">
 
 **Odoo 18 Community × Sovos e-Fatura Entegrasyon Modülü**  
-v8.0 — Haziran 2026
+Modül sürümü 18.0.8.0.7 — 2026-11-10
 
 *Logo Tiger, Mikro, ETA ve Vega karşılaştırması + tam GİB durum kodu listesi + XSD/iş kuralı validasyon + atomik numara*
 
