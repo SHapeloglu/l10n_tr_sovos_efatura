@@ -4,7 +4,7 @@
 - e-Müstahsil / e-SMM.
 - GİB şema güncellemelerini (yılda 1–2) otomatik kontrol eden betik (`VERSION` dosyası ile).
 - Dashboard için grafikler (durum dağılımı, reddedilen faturalar trendi).
-- `dokumanlar/odoo_tr_lokalizasyon_roadmap.docx` (yalnız sunucudaki kopyada) içeriğinin buraya maddelenmesi.
+- `dokumanlar/odoo_tr_lokalizasyon_roadmap.docx` içeriğinin buraya maddelenmesi.
 
 ## Ekleme Şablonu
 
