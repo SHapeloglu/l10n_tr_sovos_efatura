@@ -2,6 +2,33 @@
 
 ---
 
+## 2026-11-10
+
+**Yapılanlar:**
+- Sunucu salt okunur kontrol edildi (`ssh contabo`): `odoo18-test` autosleep ile durduruldu (`/opt/autosleep`, 5 dk boşta; logda 09:41, 12:57, 13:33 SLEEP kayıtları). `odoo18-prod` ve `odoo18-isg` HTTP 200. UFW varsayılanı deny; 1433/8090/8085 için kural yok; fail2ban sshd aktif, ban yok. Disk %88.
+- Alan adı eşlemesi (nginx): `odoo18-prod.olap.com.tr` → `odoo18-prod`; `odoo18-test.olap.com.tr` → `odoo18-test` (127.0.0.1:7999 üzerinden uyandırma); `isg.olap.com.tr` → `odoo18-isg-yeni`; `odoo-test.olap.com.tr` nginx'te yok.
+- `odoo18-test` DB'de modül `installed|18.0.8.0.7`; `olap_prod` `uninstalled` (değişmedi).
+- PR #8 (SOAP şema notu, yalnızca `task.md`) squash ile `main`'e birleşti.
+- `CLAUDE.md`, `task.md`, `README.md` güncellendi: `main`'deki `CLAUDE.md` 18.0.8.0.5 diyordu. PR #9 `main` ile çakıştı, yeniden base alınıp çözüldü, squash ile birleşti.
+- PR #5 (`docs/kurulum-0.7`, 2026-10-07, eski ve çakışan) kapatıldı; dal duruyor (birleşmedi).
+- Birleşmiş dallar silindi: uzak `docs/sovos-soap-analiz`, `test/gelen-fatura`, `fix/gelen-fatura-cron`, `fix/eslesme-sihirbazi-doviz`, `docs/md-guncelleme-20261110`; yerel `docs/sovos-soap-analiz`, `docs/md-guncelleme-20261110`.
+- Tüm md dosyaları gözden geçirildi: `architect.md` (dosya ve cron listesi repoyla uyumlu, değişiklik yok), `backlog.md` (roadmap dokümanı artık repoda; not düzeltildi), `session.md` (bu kayıt), `task.md`, `CLAUDE.md`, `README.md`.
+
+**Kararlar / neden:**
+- Root `claude` süreçleri (PID 1565460, 2223229, 3927474) kullanıcıya ait: dokunulmadı.
+- VNC 5901 tüm arayüzlerde dinliyor (UFW ile dışarıdan kapalı); durdurma ya da localhost'a bağlama kararı kullanıcıda, uygulanmadı.
+- `odoo18-test` autosleep ayarı değiştirilmedi; uyandırma/istisna kararı kullanıcıda.
+
+**Açık sorunlar:**
+- Gerçek Sovos testi yapılmadı; Sovos test hesabı yok, SOAP ad alanı ve operasyon adları resmi örnek şemayla uyuşmuyor.
+- Prod'a Sovos kurulumu ertelendi (test ve SOAP doğrulamasına bağlı).
+- `claude/epic-hypatia-m35jhz` dalı (2026-10-07, birleşmemiş): sahibi belirsiz, dokunulmadı.
+- Bu oturumda modül testleri yeniden çalıştırılmadı; son sonuç 2026-11-09 kaydı (302 test, 0 hata).
+
+**Sıradaki adım:** Sovos test hesabı sağlanırsa `test_connection` ve WSDL doğrulaması; VNC ve autosleep kararları.
+
+---
+
 ## 2026-11-08 / 11-09
 
 **Yapılanlar:**
@@ -35,7 +62,7 @@
 
 ---
 
-## 📍 Kaldığımız yer — 2026-10-06 sonu
+## 📍 Önceki durum — 2026-10-06 sonu (geçmiş kayıt)
 
 **Biten:** v8 repoya alındı → 18.0.8.0.5 (güvenlik + Odoo 18 uyumu + test düzeltmeleri); 229 test geçti; sunucu klasörü
 güncellendi (yedek `/opt/odoo/backups/l10n_tr_sovos_efatura_18.0.8.0.0_20261006_025643`); prod/test yeniden başlatıldı;
